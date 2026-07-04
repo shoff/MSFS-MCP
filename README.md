@@ -114,3 +114,7 @@ Each client is a singleton with lazy connect, a thread lock around the native ha
 ## License
 
 MIT
+
+## Companion apps
+
+- **[EFB Checklist](checklist/)** — PyQt6 always-on-top electronic checklist (normal + emergency procedures, V-speeds) for flying alongside MSFS 2024. Ships with the Cessna 172S and Piper PA-28-181 Archer.

@@ -1,0 +1,358 @@
+{
+  "id": "pa28_181",
+  "name": "Piper PA-28-181 Archer",
+  "subtitle": "Lycoming O-360 \u00b7 carbureted \u00b7 L/R tanks only \u2014 no BOTH",
+  "vspeeds": [
+    { "label": "Vr  Rotate", "value": "60 KIAS" },
+    { "label": "Vr  Rotate, short field", "value": "55 KIAS" },
+    { "label": "Vx  Best angle of climb", "value": "64 KIAS" },
+    { "label": "Vy  Best rate of climb", "value": "76 KIAS" },
+    { "label": "Best glide", "value": "76 KIAS" },
+    { "label": "Va  Maneuvering (at 2550 lb)", "value": "113 KIAS" },
+    { "label": "Vfe Max flap extension", "value": "102 KIAS" },
+    { "label": "Vno Max structural cruise", "value": "125 KIAS" },
+    { "label": "Vne Never exceed", "value": "154 KIAS" },
+    { "label": "Vs1 Stall, flaps up", "value": "50 KIAS" },
+    { "label": "Vs0 Stall, full flaps", "value": "45 KIAS" },
+    { "label": "Final approach, full flaps", "value": "66 KIAS" }
+  ],
+  "groups": [
+    {
+      "name": "Normal Procedures",
+      "kind": "normal",
+      "checklists": [
+        {
+          "id": "preflight_cockpit",
+          "name": "Preflight \u2014 Cockpit",
+          "items": [
+            { "c": "Documents (ARROW)", "r": "ON BOARD" },
+            { "c": "Control lock", "r": "REMOVE" },
+            { "c": "Avionics master", "r": "OFF" },
+            { "c": "Ignition / magnetos", "r": "OFF \u2014 KEYS OUT" },
+            { "c": "Circuit breakers", "r": "CHECK IN" },
+            { "c": "Master switch", "r": "ON" },
+            { "c": "Fuel quantity gauges", "r": "CHECK" },
+            { "c": "Annunciator panel", "r": "PUSH TO TEST" },
+            { "c": "Pitot heat", "r": "ON \u2014 CHECK \u2014 OFF" },
+            { "c": "Exterior lights", "r": "ON \u2014 CHECK \u2014 OFF" },
+            { "c": "Flaps", "r": "EXTEND FULL" },
+            { "c": "Stall warning horn", "r": "CHECK" },
+            { "c": "Master switch", "r": "OFF" },
+            { "c": "Trim (elevator & rudder)", "r": "SET NEUTRAL" },
+            { "c": "Fuel selector", "r": "CHECK \u2014 SELECT TANK" },
+            { "c": "Pitot & static drains", "r": "DRAIN" }
+          ]
+        },
+        {
+          "id": "preflight_walkaround",
+          "name": "Preflight \u2014 Walkaround",
+          "items": [
+            { "c": "Left wing surface & rivets", "r": "CHECK" },
+            { "c": "Left flap & aileron", "r": "CHECK FREE & SECURE" },
+            { "c": "Left wingtip & lights", "r": "CHECK" },
+            { "c": "Left fuel tank", "r": "VISUALLY CHECK \u2014 CAP SECURE" },
+            { "c": "Left fuel sump", "r": "DRAIN & SAMPLE" },
+            { "c": "Left main gear, tire, brake", "r": "CHECK" },
+            { "c": "Pitot / static mast (under left wing)", "r": "CLEAR" },
+            { "c": "Fuel vents", "r": "CLEAR" },
+            { "c": "Nose \u2014 oil level", "r": "CHECK (MIN 6 QTS RECOMMENDED)" },
+            { "c": "Propeller & spinner", "r": "CHECK NICKS / SECURITY" },
+            { "c": "Air inlets & alternator belt", "r": "CLEAR / CHECK" },
+            { "c": "Nose gear strut & tire", "r": "CHECK" },
+            { "c": "Gascolator (fuel strainer)", "r": "DRAIN & SAMPLE" },
+            { "c": "Windshield", "r": "CLEAN & CHECK" },
+            { "c": "Right main gear, tire, brake", "r": "CHECK" },
+            { "c": "Right fuel sump", "r": "DRAIN & SAMPLE" },
+            { "c": "Right fuel tank", "r": "VISUALLY CHECK \u2014 CAP SECURE" },
+            { "c": "Right wing, wingtip, lights", "r": "CHECK" },
+            { "c": "Right aileron & flap", "r": "CHECK FREE & SECURE" },
+            { "c": "Static wicks", "r": "CHECK" },
+            { "c": "Empennage & antennas", "r": "CHECK" },
+            { "c": "Stabilator & trim tab", "r": "CHECK FREE & SECURE" },
+            { "c": "Tail tiedown", "r": "DISCONNECT" },
+            { "c": "Baggage door", "r": "CLOSED & LOCKED" },
+            { "c": "Chocks & tiedowns", "r": "REMOVE & STOW" }
+          ]
+        },
+        {
+          "id": "before_start",
+          "name": "Before Engine Start",
+          "items": [
+            { "c": "Preflight inspection", "r": "COMPLETE" },
+            { "c": "Passenger briefing (SAFETY)", "r": "COMPLETE" },
+            { "c": "Seats & seat belts", "r": "ADJUST & SECURE" },
+            { "c": "Door", "r": "LATCHED \u2014 TOP & SIDE" },
+            { "c": "Parking brake", "r": "SET" },
+            { "c": "Circuit breakers", "r": "CHECK IN" },
+            { "c": "Carburetor heat", "r": "FULL COLD (OFF)" },
+            { "c": "Fuel selector", "r": "DESIRED TANK" },
+            { "c": "Avionics master", "r": "OFF" }
+          ]
+        },
+        {
+          "id": "engine_start",
+          "name": "Engine Start (Cold)",
+          "items": [
+            { "c": "Throttle", "r": "OPEN 1/4 INCH" },
+            { "c": "Master switch", "r": "ON" },
+            { "c": "Electric fuel pump", "r": "ON" },
+            { "c": "Mixture", "r": "FULL RICH" },
+            { "c": "Prime", "r": "AS REQUIRED (3\u20135 SEC MAX)" },
+            { "c": "Beacon / strobes", "r": "ON" },
+            { "c": "Propeller area", "r": "CLEAR" },
+            { "c": "Starter", "r": "ENGAGE" },
+            { "c": "Throttle", "r": "800\u20131000 RPM" },
+            { "c": "Oil pressure", "r": "CHECK", "note": "Within 30 seconds or shut down" },
+            { "c": "Electric fuel pump", "r": "OFF \u2014 CHECK FUEL PRESSURE HOLDS" },
+            { "c": "Avionics master", "r": "ON" },
+            { "c": "Radios / transponder", "r": "SET" }
+          ]
+        },
+        {
+          "id": "taxi",
+          "name": "Taxi",
+          "items": [
+            { "c": "Chocks", "r": "REMOVED" },
+            { "c": "Parking brake", "r": "RELEASE" },
+            { "c": "Taxi area", "r": "CLEAR" },
+            { "c": "Throttle", "r": "APPLY SLOWLY" },
+            { "c": "Brakes & steering", "r": "CHECK" },
+            { "c": "Flight instruments", "r": "CHECK IN TURNS" }
+          ]
+        },
+        {
+          "id": "before_takeoff",
+          "name": "Before Takeoff (Run-up)",
+          "items": [
+            { "c": "Parking brake", "r": "SET" },
+            { "c": "Flight controls", "r": "FREE & CORRECT" },
+            { "c": "Flight instruments / altimeter", "r": "CHECK & SET" },
+            { "c": "Fuel selector", "r": "PROPER TANK" },
+            { "c": "Mixture", "r": "RICH" },
+            { "c": "Throttle", "r": "2000 RPM" },
+            { "c": "Magnetos", "r": "CHECK", "note": "Max drop 175 RPM, max difference 50 RPM" },
+            { "c": "Carburetor heat", "r": "CHECK RPM DROP \u2014 THEN OFF" },
+            { "c": "Engine gauges / vacuum", "r": "GREEN / ~5.0 IN HG" },
+            { "c": "Ammeter", "r": "CHECK CHARGING" },
+            { "c": "Annunciator panel", "r": "PRESS TO TEST" },
+            { "c": "Throttle", "r": "IDLE CHECK \u2014 THEN 1000 RPM" },
+            { "c": "Electric fuel pump", "r": "ON" },
+            { "c": "Trim (elevator & rudder)", "r": "SET FOR TAKEOFF" },
+            { "c": "Flaps", "r": "0\u00b0 NORMAL / 25\u00b0 SHORT-SOFT" },
+            { "c": "Door & window", "r": "LATCHED" },
+            { "c": "Seats & belts", "r": "SECURE" },
+            { "c": "Takeoff briefing", "r": "COMPLETE" },
+            { "c": "Landing light & strobes", "r": "ON" },
+            { "c": "Transponder", "r": "ALT" }
+          ]
+        },
+        {
+          "id": "takeoff",
+          "name": "Normal Takeoff",
+          "items": [
+            { "c": "Throttle", "r": "FULL OPEN" },
+            { "c": "Engine gauges", "r": "GREEN" },
+            { "c": "Airspeed", "r": "ALIVE" },
+            { "c": "Rotate", "r": "60 KIAS" },
+            { "c": "Climb", "r": "76 KIAS (Vy)" }
+          ]
+        },
+        {
+          "id": "climb_cruise",
+          "name": "Climb & Cruise",
+          "items": [
+            { "c": "Climb airspeed", "r": "76 KIAS" },
+            { "c": "Electric fuel pump", "r": "OFF AT SAFE ALTITUDE", "note": "Watch fuel pressure as you switch it off" },
+            { "c": "Landing light", "r": "OFF (ABOVE 1000 FT AGL)" },
+            { "c": "Cruise power", "r": "SET (\u22482400 RPM)" },
+            { "c": "Mixture", "r": "LEAN FOR CRUISE" },
+            { "c": "Fuel selector", "r": "SWITCH TANKS EVERY 30\u201360 MIN", "note": "No BOTH position \u2014 log the time you switch" },
+            { "c": "Engine gauges", "r": "MONITOR" }
+          ]
+        },
+        {
+          "id": "descent_approach",
+          "name": "Descent & Approach",
+          "items": [
+            { "c": "ATIS / AWOS", "r": "OBTAIN" },
+            { "c": "Altimeter", "r": "SET" },
+            { "c": "Approach briefing", "r": "CONDUCT" },
+            { "c": "Fuel selector", "r": "FULLEST TANK" },
+            { "c": "Mixture", "r": "ENRICH AS REQUIRED" },
+            { "c": "Carburetor heat", "r": "AS REQUIRED", "note": "On at reduced power or in suspected icing" }
+          ]
+        },
+        {
+          "id": "before_landing",
+          "name": "Before Landing",
+          "items": [
+            { "c": "Seats & belts", "r": "SECURE" },
+            { "c": "Fuel selector", "r": "FULLEST TANK" },
+            { "c": "Electric fuel pump", "r": "ON" },
+            { "c": "Mixture", "r": "RICH" },
+            { "c": "Carburetor heat", "r": "AS REQUIRED" },
+            { "c": "Landing light", "r": "ON" },
+            { "c": "Flaps", "r": "AS REQUIRED (Vfe 102)" },
+            { "c": "Final approach speed", "r": "66 KIAS FULL FLAPS" }
+          ]
+        },
+        {
+          "id": "after_landing",
+          "name": "After Landing",
+          "items": [
+            { "c": "Flaps", "r": "RETRACT" },
+            { "c": "Electric fuel pump", "r": "OFF" },
+            { "c": "Carburetor heat", "r": "OFF" },
+            { "c": "Landing light & strobes", "r": "AS REQUIRED" },
+            { "c": "Transponder", "r": "GND / STANDBY" }
+          ]
+        },
+        {
+          "id": "shutdown",
+          "name": "Shutdown & Securing",
+          "items": [
+            { "c": "Parking brake", "r": "SET" },
+            { "c": "Avionics master", "r": "OFF" },
+            { "c": "Electrical equipment", "r": "OFF" },
+            { "c": "Throttle", "r": "IDLE" },
+            { "c": "Mixture", "r": "IDLE CUT-OFF" },
+            { "c": "Magnetos", "r": "OFF \u2014 KEYS OUT" },
+            { "c": "Master switch", "r": "OFF" },
+            { "c": "Control lock", "r": "INSTALL" },
+            { "c": "Tach & Hobbs", "r": "RECORD" },
+            { "c": "Tiedowns & chocks", "r": "SECURE" },
+            { "c": "Flight plan", "r": "CLOSE" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Emergency Procedures",
+      "kind": "emergency",
+      "checklists": [
+        {
+          "id": "engine_fire_start",
+          "name": "Engine Fire During Start",
+          "items": [
+            { "c": "Starter", "r": "CONTINUE CRANKING" },
+            { "c": "Mixture", "r": "IDLE CUT-OFF" },
+            { "c": "Throttle", "r": "OPEN" },
+            { "c": "Electric fuel pump", "r": "OFF" },
+            { "c": "Fuel selector", "r": "OFF" },
+            { "c": "Fire extinguisher", "r": "OBTAIN \u2014 EVACUATE" }
+          ]
+        },
+        {
+          "id": "eng_fail_takeoff",
+          "name": "Engine Failure \u2014 Takeoff",
+          "items": [
+            { "c": "Airspeed", "r": "MAINTAIN SAFE AIRSPEED" },
+            { "c": "Land", "r": "STRAIGHT AHEAD", "note": "Do not attempt to turn back at low altitude" },
+            { "c": "If altitude allows \u2014 Fuel selector", "r": "SWITCH TANKS" },
+            { "c": "Electric fuel pump", "r": "ON" },
+            { "c": "Mixture", "r": "RICH" },
+            { "c": "Carburetor heat", "r": "ON" }
+          ]
+        },
+        {
+          "id": "eng_fail_flight",
+          "name": "Engine Failure in Flight \u2014 Restart",
+          "items": [
+            { "c": "Airspeed", "r": "76 KIAS (BEST GLIDE)" },
+            { "c": "Best field", "r": "SELECT \u2014 TURN TOWARD IT", "note": "Check wind direction" },
+            { "c": "Fuel selector", "r": "SWITCH TANKS", "note": "Most common cause: ran the selected tank dry" },
+            { "c": "Electric fuel pump", "r": "ON" },
+            { "c": "Mixture", "r": "FULL RICH" },
+            { "c": "Carburetor heat", "r": "FULL ON" },
+            { "c": "Magnetos", "r": "CHECK \u2014 OFF THEN ON ONE AT A TIME" },
+            { "c": "Engine gauges", "r": "CHECK FOR CAUSE" },
+            { "c": "If no restart", "r": "POWER-OFF LANDING CHECKLIST" }
+          ]
+        },
+        {
+          "id": "power_off_landing",
+          "name": "Power-Off Landing",
+          "items": [
+            { "c": "Airspeed / trim", "r": "76 KIAS BEST GLIDE" },
+            { "c": "Declare", "r": "121.5 MAYDAY \u2014 SQUAWK 7700" },
+            { "c": "Seat belts & harnesses", "r": "SECURE \u2014 TIGHT" },
+            { "c": "Mixture", "r": "IDLE CUT-OFF" },
+            { "c": "Fuel selector", "r": "OFF" },
+            { "c": "Magnetos", "r": "OFF" },
+            { "c": "Flaps", "r": "FULL IF POSSIBLE" },
+            { "c": "Master switch", "r": "OFF" },
+            { "c": "Door", "r": "UNLATCH BEFORE TOUCHDOWN" }
+          ]
+        },
+        {
+          "id": "engine_fire_flight",
+          "name": "Engine Fire in Flight",
+          "items": [
+            { "c": "Fuel selector", "r": "OFF" },
+            { "c": "Throttle", "r": "CLOSED" },
+            { "c": "Mixture", "r": "IDLE CUT-OFF" },
+            { "c": "Electric fuel pump", "r": "OFF" },
+            { "c": "Cabin heat & defrost", "r": "OFF" },
+            { "c": "Airspeed", "r": "INCREASE TO BLOW OUT FIRE" },
+            { "c": "Power-off landing", "r": "EXECUTE" }
+          ]
+        },
+        {
+          "id": "electrical_fire",
+          "name": "Electrical Fire in Flight",
+          "items": [
+            { "c": "Master switch", "r": "OFF" },
+            { "c": "Cabin vents", "r": "OPEN" },
+            { "c": "Cabin heat", "r": "OFF" },
+            { "c": "Fire extinguisher", "r": "AS REQUIRED" },
+            { "c": "Land", "r": "AS SOON AS POSSIBLE" }
+          ]
+        },
+        {
+          "id": "electrical_failure",
+          "name": "Electrical Failure (ALT Light)",
+          "items": [
+            { "c": "Ammeter", "r": "CHECK \u2014 VERIFY ALTERNATOR INOP" },
+            { "c": "If ammeter zero \u2014 Alternator switch", "r": "OFF" },
+            { "c": "Electrical load", "r": "REDUCE TO MINIMUM" },
+            { "c": "Alternator circuit breaker", "r": "CHECK & RESET" },
+            { "c": "Alternator switch", "r": "ON" },
+            { "c": "If not restored \u2014 Alternator", "r": "OFF \u2014 LAND WHEN PRACTICAL" }
+          ]
+        },
+        {
+          "id": "loss_fuel_pressure",
+          "name": "Loss of Fuel Pressure",
+          "items": [
+            { "c": "Electric fuel pump", "r": "ON" },
+            { "c": "Fuel selector", "r": "SWITCH TANKS" }
+          ]
+        },
+        {
+          "id": "open_door",
+          "name": "Open Door in Flight",
+          "items": [
+            { "c": "Fly the airplane", "r": "FIRST", "note": "The door will not open far \u2014 it is a nuisance, not an emergency" },
+            { "c": "Airspeed", "r": "SLOW TO 87 KIAS" },
+            { "c": "Cabin vents", "r": "CLOSED" },
+            { "c": "Storm window", "r": "OPEN" },
+            { "c": "If lower latch open", "r": "PULL ARMREST \u2014 LATCH" },
+            { "c": "If both open", "r": "LATCH LOWER, THEN UPPER" }
+          ]
+        },
+        {
+          "id": "spin_recovery",
+          "name": "Spin Recovery",
+          "items": [
+            { "c": "Throttle", "r": "IDLE" },
+            { "c": "Ailerons", "r": "NEUTRAL" },
+            { "c": "Rudder", "r": "FULL OPPOSITE ROTATION" },
+            { "c": "Control wheel", "r": "FULL FORWARD" },
+            { "c": "Rudder", "r": "NEUTRAL WHEN ROTATION STOPS" },
+            { "c": "Recover", "r": "SMOOTHLY TO LEVEL FLIGHT" }
+          ]
+        }
+      ]
+    }
+  ]
+}
