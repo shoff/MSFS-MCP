@@ -1,0 +1,15 @@
+# Core MCP server
+mcp[cli]>=1.2.0
+
+# Layer 1 — official SimConnect API (Windows only; talks to MSFS over the wire)
+SimConnect>=0.4.26          # python-SimConnect (a.k.a. Python-SimConnect)
+
+# Layer 2 — FSUIPC7 offset table bridge (Windows only; requires FSUIPC7 running)
+fsuipc>=2.0.0               # Paul Henty's official FSUIPC Python module
+
+# Layer 3 — raw process-memory escape hatch (Windows only)
+pymem>=1.13.1
+
+# Config / utilities
+pydantic>=2.6
+python-dotenv>=1.0
