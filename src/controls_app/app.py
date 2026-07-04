@@ -1,17 +1,24 @@
 """MSFS 2024 controls setup advisor — dark, minimal, Claude-assisted.
 
 Run with ``msfs-controls`` or ``python -m controls_app``.
+
+Features: live device visualizers (press a button on the Bravo and it lights
+up), Learn mode to map physical inputs exactly, Claude-reviewed binding plans,
+and direct writing of bindings into MSFS input profiles (with backups).
 """
 
 from __future__ import annotations
 
 import sys
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, QThread, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -19,8 +26,10 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSplitter,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QTextBrowser,
@@ -31,11 +40,21 @@ from PyQt6.QtWidgets import (
 
 from checklist_app import theme
 
-from . import advisor
+from . import advisor, msfs_profiles
 from .bindings import ControlPlan, load_default_plans
+from .device_views import DeviceView, build_views
 from .devices import DEVICE_BY_ID, DEVICES, detect_connected
+from .input_map import InputMap, load_maps, save_maps
+from .input_monitor import InputMonitor
 
 PRIORITY_COLORS = {"essential": theme.RED, "recommended": theme.ACCENT, "optional": theme.TEXT_FAINT}
+
+# How each device is named inside MSFS profile XML <Device DeviceName="...">
+MSFS_DEVICE_FRAGMENTS = {
+    "honeycomb_alpha": "Alpha Flight Controls",
+    "honeycomb_bravo": "Bravo Throttle",
+    "velocityone_rudder": "Rudder",
+}
 
 CONTROLS_QSS = f"""
 QTableWidget {{
@@ -78,14 +97,30 @@ QLineEdit {{
 }}
 QLineEdit:focus {{ border-color: {theme.ACCENT_DIM}; }}
 QSplitter::handle {{ background: {theme.BORDER}; height: 1px; }}
-QPushButton#AskButton {{
+QPushButton#AskButton, QPushButton#WriteButton {{
     background: {theme.ACCENT_DIM};
     color: {theme.TEXT};
     border-color: {theme.ACCENT_DIM};
     font-weight: 600;
 }}
-QPushButton#AskButton:hover {{ background: {theme.ACCENT}; color: #0b1016; }}
+QPushButton#AskButton:hover, QPushButton#WriteButton:hover {{ background: {theme.ACCENT}; color: #0b1016; }}
 QPushButton#AskButton:disabled {{ background: {theme.PANEL_ALT}; color: {theme.TEXT_FAINT}; }}
+QLabel#RawInput {{
+    color: {theme.AMBER};
+    font-size: 11px;
+    font-family: "Consolas", monospace;
+}}
+QDialog {{ background: {theme.BG}; }}
+QDialog QLabel {{ color: {theme.TEXT}; font-size: 12px; }}
+QListWidget {{
+    background: {theme.PANEL_ALT};
+    color: {theme.TEXT};
+    border: 1px solid {theme.BORDER};
+    border-radius: 8px;
+    font-size: 12px;
+}}
+QListWidget::item {{ padding: 6px 10px; }}
+QListWidget::item:selected {{ background: {theme.ROW_HOVER}; }}
 """
 
 
@@ -122,6 +157,144 @@ def _aircraft_context(aircraft_key: str) -> str:
     return ""
 
 
+class WriteDialog(QDialog):
+    """Pick an MSFS profile, preview the bindings, back up, and write."""
+
+    def __init__(self, parent, plan: ControlPlan, device_id: str, input_map: InputMap):
+        super().__init__(parent)
+        self.plan = plan
+        self.device_id = device_id
+        self.input_map = input_map
+        self.profiles: list[msfs_profiles.InputProfile] = []
+
+        device = DEVICE_BY_ID[device_id]
+        self.setWindowTitle(f"Write bindings to MSFS — {device.name}")
+        self.resize(760, 620)
+
+        lay = QVBoxLayout(self)
+        intro = QLabel(
+            f"<b>{plan.aircraft_name}</b> · {device.name}<br>"
+            f"<span style='color:{theme.TEXT_DIM}'>Close MSFS (or at least the Controls menu) first. "
+            "Bindings are written into an EXISTING profile — create one for this device in the MSFS "
+            "Controls menu if you haven't. A timestamped backup is saved before any change "
+            "(~/.msfs_companion/profile_backups).</span>"
+        )
+        intro.setWordWrap(True)
+        lay.addWidget(intro)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Profiles found:"))
+        row.addStretch(1)
+        rescan = QPushButton("Rescan")
+        rescan.clicked.connect(self._scan)
+        row.addWidget(rescan)
+        browse = QPushButton("Browse folder…")
+        browse.clicked.connect(self._browse)
+        row.addWidget(browse)
+        lay.addLayout(row)
+
+        self.profile_list = QListWidget()
+        self.profile_list.setMaximumHeight(140)
+        lay.addWidget(self.profile_list)
+
+        self.preview = QTableWidget(0, 3)
+        self.preview.setHorizontalHeaderLabels(["MSFS ACTION", "BOUND TO", "FROM CONTROL"])
+        self.preview.verticalHeader().setVisible(False)
+        self.preview.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.preview.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.preview.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.preview.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        lay.addWidget(self.preview, 1)
+
+        self.skipped_label = QLabel()
+        self.skipped_label.setWordWrap(True)
+        self.skipped_label.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 11px;")
+        lay.addWidget(self.skipped_label)
+
+        buttons = QDialogButtonBox()
+        self.write_btn = buttons.addButton("Backup && Write", QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self._write)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+        self._resolve()
+        self._scan()
+
+    def _resolve(self) -> None:
+        device = DEVICE_BY_ID[self.device_id]
+        control_ids = {c.label: c.id for c in device.inputs}
+        bindings = self.plan.devices.get(self.device_id, [])
+        self.resolved = msfs_profiles.resolve_writes(bindings, control_ids, self.input_map)
+
+        self.preview.setRowCount(len(self.resolved.actions))
+        for row, aw in enumerate(self.resolved.actions):
+            for col, text in enumerate([aw.action_name, aw.keycode, aw.information]):
+                self.preview.setItem(row, col, QTableWidgetItem(text))
+        if self.resolved.skipped:
+            lines = "; ".join(f"{c} ({r})" for c, r in self.resolved.skipped)
+            self.skipped_label.setText(f"Set manually in the MSFS UI: {lines}")
+        else:
+            self.skipped_label.setText("")
+        self.write_btn.setEnabled(bool(self.resolved.actions))
+
+    def _scan(self, extra: list | None = None) -> None:
+        self.profiles = msfs_profiles.find_profiles(extra)
+        self.profile_list.clear()
+        if not self.profiles:
+            self.profile_list.addItem(
+                "No MSFS input profiles found — is MSFS installed on this machine? Use Browse…"
+            )
+            return
+        for prof in self.profiles:
+            devices = ", ".join(prof.device_names)
+            item = QListWidgetItem(f"{prof.friendly_name}   [{prof.source}]   ({devices})")
+            item.setData(Qt.ItemDataRole.UserRole, prof)
+            self.profile_list.addItem(item)
+        # preselect a profile containing this device
+        fragment = MSFS_DEVICE_FRAGMENTS.get(self.device_id, "").lower()
+        for i, prof in enumerate(self.profiles):
+            if any(fragment in d.lower() for d in prof.device_names):
+                self.profile_list.setCurrentRow(i)
+                break
+
+    def _browse(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "Folder containing MSFS input profiles")
+        if folder:
+            from pathlib import Path
+
+            self._scan([Path(folder)])
+
+    def _write(self) -> None:
+        item = self.profile_list.currentItem()
+        prof = item.data(Qt.ItemDataRole.UserRole) if item else None
+        if prof is None:
+            QMessageBox.warning(self, "Pick a profile", "Select the MSFS profile to write into.")
+            return
+        fragment = MSFS_DEVICE_FRAGMENTS.get(self.device_id)
+        if not fragment:
+            QMessageBox.warning(self, "Not writable", "Keyboard/mouse bindings must be set in the MSFS UI.")
+            return
+        try:
+            backup = msfs_profiles.write_bindings(prof.path, fragment, self.resolved.actions)
+        except msfs_profiles.ProfileError as exc:
+            QMessageBox.critical(self, "Write failed", str(exc))
+            return
+        except OSError as exc:
+            QMessageBox.critical(self, "Write failed", f"Could not write the file: {exc}")
+            return
+        QMessageBox.information(
+            self,
+            "Bindings written",
+            f"Wrote {len(self.resolved.actions)} bindings into '{prof.friendly_name}'.\n\n"
+            f"Backup: {backup}\n\n"
+            "Start (or restart) MSFS and select this profile in Options → Controls. "
+            "If anything looks wrong in-game, restore the backup by copying it over the "
+            "profile file.",
+        )
+        self.accept()
+
+
 class MainWindow(QMainWindow):
     def __init__(self, plans: dict[str, ControlPlan], detected: dict[str, bool]):
         super().__init__()
@@ -129,10 +302,12 @@ class MainWindow(QMainWindow):
         self.detected = detected
         self.plan: ControlPlan | None = None
         self.worker: AdvisorWorker | None = None
+        self.maps = load_maps()
+        self.views: dict[str, DeviceView] = build_views()
 
         self.setWindowTitle("Flight Controls Setup")
-        self.resize(1180, 820)
-        self.setMinimumSize(760, 560)
+        self.resize(1180, 980)
+        self.setMinimumSize(820, 640)
 
         root = QWidget(objectName="Root")
         self.setCentralWidget(root)
@@ -157,6 +332,15 @@ class MainWindow(QMainWindow):
 
         self._populate_sidebar()
         self._load_plan_for_aircraft()
+
+        # live input
+        self.monitor = InputMonitor(self)
+        self.monitor.button_changed.connect(self._on_button)
+        self.monitor.axis_changed.connect(self._on_axis)
+        self.monitor.hat_changed.connect(self._on_hat)
+        self.monitor.devices_changed.connect(self._on_devices_changed)
+        self.monitor.start()
+        QApplication.instance().installEventFilter(self)
 
     # -------------------------------------------------------------- header
     def _build_header(self) -> QWidget:
@@ -187,6 +371,14 @@ class MainWindow(QMainWindow):
         self.ask_btn.clicked.connect(self._ask_claude)
         lay.addWidget(self.ask_btn)
 
+        self.write_btn = QPushButton("⭳ Write to MSFS", objectName="WriteButton")
+        self.write_btn.setToolTip(
+            "Write this device's bindings directly into an MSFS input profile\n"
+            "(backs the file up first)."
+        )
+        self.write_btn.clicked.connect(self._write_to_msfs)
+        lay.addWidget(self.write_btn)
+
         pin = QToolButton()
         pin.setText("⏏ On top")
         pin.setCheckable(True)
@@ -206,11 +398,35 @@ class MainWindow(QMainWindow):
         self.device_title = QLabel(objectName="SectionTitle")
         title_row.addWidget(self.device_title)
         title_row.addStretch(1)
+        self.raw_input = QLabel("", objectName="RawInput")
+        title_row.addWidget(self.raw_input)
+        self.learn_btn = QToolButton()
+        self.learn_btn.setText("🎯 Learn")
+        self.learn_btn.setCheckable(True)
+        self.learn_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.learn_btn.setToolTip(
+            "Learn mode: click a control on the diagram, then press/move the real thing.\n"
+            "The mapping is saved and used for highlighting AND for writing MSFS profiles."
+        )
+        self.learn_btn.toggled.connect(self._on_learn_toggle)
+        title_row.addWidget(self.learn_btn)
+        rescan = QToolButton()
+        rescan.setText("⟳ Rescan")
+        rescan.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        rescan.setToolTip("Re-detect connected hardware")
+        rescan.clicked.connect(lambda: self.monitor.rescan())
+        title_row.addWidget(rescan)
         self.device_status = QLabel(objectName="SectionMeta")
         title_row.addWidget(self.device_status)
         lay.addLayout(title_row)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
+
+        self.view_stack = QStackedWidget()
+        for device_id, view in self.views.items():
+            view.element_clicked.connect(self._on_element_clicked)
+            self.view_stack.addWidget(view)
+        splitter.addWidget(self.view_stack)
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["CONTROL", "BIND TO", "SEARCH IN MSFS CONTROLS", "HOW TO USE IT"])
@@ -231,7 +447,7 @@ class MainWindow(QMainWindow):
         self.guidance = QTextBrowser()
         self.guidance.setOpenExternalLinks(True)
         splitter.addWidget(self.guidance)
-        splitter.setSizes([460, 240])
+        splitter.setSizes([300, 330, 190])
         lay.addWidget(splitter, 1)
         return pane
 
@@ -252,6 +468,7 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------- sidebar
     def _populate_sidebar(self) -> None:
+        self.sidebar.clear()
         header = QListWidgetItem("DEVICES")
         header.setFlags(Qt.ItemFlag.NoItemFlags)
         self.sidebar.addItem(header)
@@ -293,6 +510,7 @@ class MainWindow(QMainWindow):
         self.device_status.setText(
             f"{device.manufacturer} · " + ("connected" if on else "not detected — plan shown anyway")
         )
+        self.view_stack.setCurrentWidget(self.views[device_id])
 
         bindings = self.plan.devices.get(device_id, [])
         self.table.setRowCount(len(bindings))
@@ -321,6 +539,72 @@ class MainWindow(QMainWindow):
             f"<p><b>Setup &amp; flying guide</b></p><ol>{steps}</ol>"
             f"<p>{legend} &nbsp;·&nbsp; <span style='color:{theme.TEXT_FAINT}'>plan source: {p.source}</span></p>"
         )
+
+    # ---------------------------------------------------------- live input
+    def _on_devices_changed(self, detected: dict) -> None:
+        self.detected = detected
+        self._populate_sidebar()
+
+    def _view_and_map(self, device_id: str) -> tuple[DeviceView, InputMap]:
+        return self.views[device_id], self.maps[device_id]
+
+    def _on_button(self, device_id: str, index: int, pressed: bool) -> None:
+        view, imap = self._view_and_map(device_id)
+        self.raw_input.setText(f"{device_id}: button {index} {'▼' if pressed else '▲'}")
+        if pressed and view.learn_mode and view.selected:
+            imap.learn_button(index, view.selected)
+            save_maps(self.maps)
+            self.status.setText(f"Learned: button {index} → {view.selected} (saved)")
+            view.pulse(view.selected)
+            return
+        control = imap.control_for_button(index)
+        if control:
+            view.set_pressed(control, pressed)
+
+    def _on_axis(self, device_id: str, index: int, value: float) -> None:
+        view, imap = self._view_and_map(device_id)
+        self.raw_input.setText(f"{device_id}: axis {index} = {value:+.2f}")
+        if view.learn_mode and view.selected and abs(value) > 0.75:
+            imap.learn_axis(index, view.selected)
+            save_maps(self.maps)
+            self.status.setText(f"Learned: axis {index} → {view.selected} (saved)")
+        control = imap.control_for_axis(index)
+        if control:
+            view.set_value(control, value)
+
+    def _on_hat(self, device_id: str, index: int, x: int, y: int) -> None:
+        view, imap = self._view_and_map(device_id)
+        if x or y:
+            self.raw_input.setText(f"{device_id}: hat {index} = ({x},{y})")
+            control = imap.hats.get(index)
+            if control:
+                view.pulse(control)
+
+    def _on_element_clicked(self, control_id: str) -> None:
+        view = self.view_stack.currentWidget()
+        if isinstance(view, DeviceView) and view.learn_mode:
+            view.set_selected(control_id)
+            self.status.setText(
+                f"Learn: now press / move the physical '{control_id}' on the {view.device_id}…"
+            )
+
+    def _on_learn_toggle(self, on: bool) -> None:
+        for view in self.views.values():
+            view.learn_mode = on
+            if not on:
+                view.set_selected(None)
+        self.status.setText(
+            "Learn mode: click a control on the diagram, then press the real input." if on else ""
+        )
+
+    def eventFilter(self, obj, event):  # noqa: N802 — keyboard/mouse visualizer
+        if self.isActiveWindow():
+            view = self.views.get("keyboard_mouse")
+            if event.type() == QEvent.Type.KeyPress and view:
+                view.pulse("keys")
+            elif event.type() == QEvent.Type.MouseButtonPress and view:
+                view.pulse("mouse")
+        return super().eventFilter(obj, event)
 
     # -------------------------------------------------------------- Claude
     def _ask_claude(self) -> None:
@@ -360,11 +644,28 @@ class MainWindow(QMainWindow):
         self.ask_btn.setEnabled(True)
         self.ask_btn.setText("✦ Ask Claude")
 
+    # ------------------------------------------------------------ profiles
+    def _write_to_msfs(self) -> None:
+        device_id = self._current_device_id()
+        if not device_id or device_id == "keyboard_mouse":
+            QMessageBox.information(
+                self, "Pick a device",
+                "Select the Alpha, Bravo or rudder pedals in the sidebar — keyboard/mouse "
+                "bindings are quick to set in the MSFS UI itself.",
+            )
+            return
+        dialog = WriteDialog(self, self.plan, device_id, self.maps[device_id])
+        dialog.exec()
+
     # -------------------------------------------------------------- window
     def _on_pin_toggle(self, on: bool) -> None:
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on)
         if self.isVisible():
             self.show()
+
+    def closeEvent(self, event):  # noqa: N802
+        self.monitor.stop()
+        super().closeEvent(event)
 
 
 def main() -> int:
