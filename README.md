@@ -1,5 +1,7 @@
 # msfs2024-mcp
 
+> ✈️ **Also in this repo:** a dark-mode PyQt6 [electronic flight checklist app](src/checklist_app/README.md) (Cessna 172S + Piper Archer II, normal/abnormal/emergency procedures) designed to float on top of MSFS 2024. Install with `pip install -e ".[checklist]"`, run with `msfs-checklist`.
+
 A [Model Context Protocol](https://modelcontextprotocol.io) server for **Microsoft Flight Simulator 2024**. It lets an MCP client (Claude Desktop, Claude Code, etc.) read live sim state and drive the aircraft across three capability layers:
 
 | Layer | Source | Covers | Setup |

@@ -1,0 +1,562 @@
+{
+  "name": "Cessna 172S Skyhawk",
+  "short_name": "C172S",
+  "source": "Leading Edge Aviation C172S checklist (leaviation.com), cross-checked against the Cessna 172S POH. For simulation use only.",
+  "vspeeds": [
+    ["Vso (stall, flaps full)", "40 KIAS"],
+    ["Vs (stall, clean)", "48 KIAS"],
+    ["Vr (rotate)", "55 KIAS"],
+    ["Vx (best angle, SL)", "62 KIAS"],
+    ["Vy (best rate, SL)", "74 KIAS"],
+    ["Vfe (flaps 10°)", "110 KIAS"],
+    ["Vfe (flaps full)", "85 KIAS"],
+    ["Va (2550 lb)", "105 KIAS"],
+    ["Va (2200 lb)", "98 KIAS"],
+    ["Vno (max structural cruise)", "129 KIAS"],
+    ["Vne (never exceed)", "163 KIAS"],
+    ["Best glide", "68 KIAS"],
+    ["Emergency landing, flaps up", "65 KIAS"],
+    ["Emergency landing, flaps down", "60 KIAS"]
+  ],
+  "sections": [
+    {
+      "name": "Preflight — Cabin",
+      "group": "Normal",
+      "items": [
+        {"kind": "note", "challenge": "Remove gust locks and pitot cover if installed."},
+        {"challenge": "Fuel quantities", "response": "CHECK"},
+        {"challenge": "Inspections", "response": "CHECK DATES & TIMES"},
+        {"challenge": "Weight and CG", "response": "WITHIN LIMITS"},
+        {"challenge": "Documents (ARROW)", "response": "CHECK"},
+        {"challenge": "Control wheel lock", "response": "REMOVE"},
+        {"challenge": "Ignition switch", "response": "OFF"},
+        {"challenge": "Avionics switch", "response": "OFF"},
+        {"challenge": "Master switch", "response": "ON"},
+        {"challenge": "Avionics switch", "response": "ON"},
+        {"challenge": "Avionics cooling fan", "response": "CHECK ON"},
+        {"challenge": "Avionics switch", "response": "OFF"},
+        {"challenge": "Fuel quantity indicators", "response": "CHECK"},
+        {"challenge": "Flaps", "response": "EXTEND"},
+        {"challenge": "Interior / exterior lights", "response": "CHECK"},
+        {"challenge": "Pitot heat", "response": "CHECK, THEN OFF"},
+        {"challenge": "Master switch", "response": "OFF"},
+        {"challenge": "Fuel shutoff valve", "response": "ON"},
+        {"challenge": "Fire extinguisher", "response": "CHECK CHARGE"}
+      ]
+    },
+    {
+      "name": "Preflight — Empennage",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Antennas", "response": "CHECK"},
+        {"challenge": "Baggage door", "response": "LOCKED"},
+        {"challenge": "Autopilot static port", "response": "CHECK"},
+        {"challenge": "Left side of fuselage", "response": "CHECK"},
+        {"challenge": "Control surfaces", "response": "CHECK"},
+        {"challenge": "Tail tie-down", "response": "REMOVE"},
+        {"challenge": "Beacon / position light", "response": "CHECK"},
+        {"challenge": "Right side of fuselage", "response": "CHECK"}
+      ]
+    },
+    {
+      "name": "Preflight — Right Wing",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Flap and aileron", "response": "CHECK"},
+        {"challenge": "Position light", "response": "CHECK"},
+        {"challenge": "Strobe", "response": "CHECK"},
+        {"challenge": "Wing", "response": "CHECK"},
+        {"challenge": "Wing tie-down", "response": "REMOVE"},
+        {"challenge": "Wing root vents", "response": "CHECK"},
+        {"challenge": "Wheel assembly", "response": "CHECK"},
+        {"challenge": "Fuel tank sumps (5)", "response": "DRAIN & CHECK"},
+        {"challenge": "Fuel quantity", "response": "CHECK / CAP SECURE"}
+      ]
+    },
+    {
+      "name": "Preflight — Nose",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Fuel sumps (3)", "response": "DRAIN & CHECK"},
+        {"challenge": "Oil quantity (5–8 qts)", "response": "CHECK"},
+        {"challenge": "Oil cooler", "response": "CHECK"},
+        {"challenge": "Cowling, propeller, spinner", "response": "CHECK"},
+        {"challenge": "Air inlets", "response": "CLEAR"},
+        {"challenge": "Alternator belt", "response": "CHECK"},
+        {"challenge": "Air filter", "response": "CHECK"},
+        {"challenge": "Nose wheel assembly", "response": "CHECK"},
+        {"challenge": "Static port", "response": "CHECK"},
+        {"challenge": "Windshield", "response": "CLEAN & CHECK"}
+      ]
+    },
+    {
+      "name": "Preflight — Left Wing",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Fuel tank sumps (5)", "response": "DRAIN & CHECK"},
+        {"challenge": "Fuel quantity", "response": "CHECK / CAP SECURE"},
+        {"challenge": "Wing root vents", "response": "CHECK"},
+        {"challenge": "Pitot tube", "response": "CHECK"},
+        {"challenge": "Stall warning opening", "response": "CHECK FOR BLOCKAGE"},
+        {"challenge": "Wing tie-down", "response": "REMOVE"},
+        {"challenge": "Fuel tank vent", "response": "CHECK FOR BLOCKAGE"},
+        {"challenge": "Wing", "response": "CHECK"},
+        {"challenge": "Position light", "response": "CHECK"},
+        {"challenge": "Strobe", "response": "CHECK"},
+        {"challenge": "Flap and aileron", "response": "CHECK"},
+        {"challenge": "Wheel assembly", "response": "CHECK"}
+      ]
+    },
+    {
+      "name": "Before Starting Engine",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Preflight inspection", "response": "COMPLETE"},
+        {"challenge": "Passenger briefing", "response": "COMPLETE"},
+        {"challenge": "Seat belts / shoulder harness", "response": "ADJUSTED & SECURE"},
+        {"challenge": "Fuel shutoff valve", "response": "ON"},
+        {"challenge": "Fuel selector valve", "response": "BOTH"},
+        {"challenge": "Circuit breakers", "response": "CHECK IN"},
+        {"challenge": "Avionics master switch", "response": "OFF"},
+        {"challenge": "Brakes", "response": "TEST & SET"}
+      ]
+    },
+    {
+      "name": "Starting Engine",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Mixture", "response": "IDLE CUT-OFF"},
+        {"challenge": "Throttle", "response": "OPEN ¼–½ INCH"},
+        {"challenge": "Beacon", "response": "ON"},
+        {"challenge": "Master switch (battery only)", "response": "ON"},
+        {"challenge": "Aux fuel pump", "response": "ON"},
+        {"challenge": "Mixture", "response": "FULL RICH UNTIL FUEL PRESSURE RISES"},
+        {"challenge": "Mixture", "response": "IDLE CUT-OFF"},
+        {"challenge": "Aux fuel pump", "response": "OFF"},
+        {"challenge": "Propeller area", "response": "CLEAR"},
+        {"challenge": "Ignition", "response": "ENGAGE"},
+        {"kind": "note", "challenge": "Do not crank more than 10 seconds; allow 20 seconds to cool. Refer to POH if no start after 3 attempts."},
+        {"challenge": "Mixture (when engine starts)", "response": "FULL RICH"},
+        {"challenge": "Throttle", "response": "1000 RPM"},
+        {"challenge": "Oil pressure", "response": "INDICATING GREEN"},
+        {"challenge": "Mixture", "response": "LEAN FOR TAXI"},
+        {"challenge": "Alternator", "response": "ON"},
+        {"challenge": "Ammeter", "response": "CHECK"},
+        {"challenge": "Flaps", "response": "RETRACT"},
+        {"challenge": "Navigation lights", "response": "AS REQUIRED"},
+        {"challenge": "Avionics master switch", "response": "ON"},
+        {"challenge": "Transponder", "response": "STANDBY / 1200"},
+        {"challenge": "Heading indicator", "response": "SET"},
+        {"challenge": "ASOS / ATIS", "response": "OBTAIN"},
+        {"challenge": "Altimeter", "response": "SET"},
+        {"challenge": "Advisory / departure & taxi clearance", "response": "CONTACT"}
+      ]
+    },
+    {
+      "name": "Taxi",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Brakes", "response": "CHECK"},
+        {"challenge": "Instrument cross-check", "response": "CHECK"}
+      ]
+    },
+    {
+      "name": "Before Takeoff (Run-Up)",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Nose wheel", "response": "STRAIGHT"},
+        {"challenge": "Brakes", "response": "SET & HOLD"},
+        {"challenge": "Flight controls", "response": "FREE & CORRECT"},
+        {"challenge": "Fuel shutoff valve", "response": "ON"},
+        {"challenge": "Mixture", "response": "RICH"},
+        {"challenge": "Throttle", "response": "1800 RPM"},
+        {"challenge": "Mixture", "response": "SET FOR DENSITY ALTITUDE"},
+        {"challenge": "Magnetos (125 max drop, 50 diff)", "response": "CHECK"},
+        {"challenge": "Engine gauges and ammeter", "response": "CHECK"},
+        {"challenge": "Vacuum", "response": "GREEN ARC"},
+        {"challenge": "Annunciator panel", "response": "CHECK"},
+        {"challenge": "Throttle", "response": "CHECK IDLE"},
+        {"challenge": "Throttle", "response": "1000 RPM"},
+        {"challenge": "Throttle friction lock", "response": "ADJUST"},
+        {"challenge": "Comm / nav radios", "response": "SET"},
+        {"challenge": "NAV/GPS switch", "response": "SET"},
+        {"challenge": "Flight instruments", "response": "SET & CHECKED"},
+        {"challenge": "Fuel quantities", "response": "CHECKED"},
+        {"challenge": "Trim", "response": "TEST / SET FOR TAKEOFF"},
+        {"challenge": "Autopilot", "response": "TEST / OFF"},
+        {"challenge": "Flaps", "response": "SET FOR TAKEOFF"},
+        {"challenge": "Cabin doors and windows", "response": "CLOSED & LATCHED"},
+        {"challenge": "Seats", "response": "ADJUSTED & LOCKED"},
+        {"challenge": "Departure briefing", "response": "CLEARANCE / EMERG. PLAN"},
+        {"challenge": "Advisory / tower", "response": "CONTACT"}
+      ]
+    },
+    {
+      "name": "Cleared for Takeoff",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Lights", "response": "AS REQUIRED"},
+        {"challenge": "Transponder", "response": "ALT"},
+        {"challenge": "Brakes", "response": "RELEASE"},
+        {"challenge": "Traffic", "response": "CHECK"}
+      ]
+    },
+    {
+      "name": "Normal Takeoff",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Wing flaps", "response": "0–10°"},
+        {"challenge": "Throttle", "response": "FULL OPEN"},
+        {"challenge": "Elevator control", "response": "LIFT NOSE AT 55 KIAS"},
+        {"challenge": "Climb speed", "response": "70–80 KIAS"},
+        {"challenge": "Wing flaps", "response": "RETRACT (if used)"}
+      ]
+    },
+    {
+      "name": "Short Field Takeoff",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Wing flaps", "response": "10°"},
+        {"challenge": "Brakes", "response": "HOLD"},
+        {"challenge": "Throttle", "response": "FULL OPEN"},
+        {"challenge": "Engine gauges", "response": "GREEN"},
+        {"challenge": "Brakes", "response": "RELEASE"},
+        {"challenge": "Elevator control", "response": "SLIGHTLY TAIL LOW"},
+        {"challenge": "Obstacle clearance speed", "response": "56 KIAS"},
+        {"kind": "note", "challenge": "After clearing obstacle:"},
+        {"challenge": "Airspeed", "response": "ACCELERATE TO NORMAL CLIMB"},
+        {"challenge": "Wing flaps", "response": "RETRACT"}
+      ]
+    },
+    {
+      "name": "Soft Field Takeoff",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Wing flaps", "response": "10°"},
+        {"challenge": "Elevator control", "response": "TAIL LOW"},
+        {"challenge": "Throttle", "response": "FULL OPEN"},
+        {"challenge": "Accelerate", "response": "IN GROUND EFFECT"},
+        {"challenge": "Climb speed", "response": "65 KIAS"},
+        {"challenge": "Wing flaps", "response": "RETRACT"}
+      ]
+    },
+    {
+      "name": "Enroute Climb",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Airspeed", "response": "85–100 KIAS"},
+        {"challenge": "Throttle", "response": "FULL OPEN"},
+        {"challenge": "Mixture", "response": "AS REQUIRED"}
+      ]
+    },
+    {
+      "name": "Cruise",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Power", "response": "SET FOR CRUISE"},
+        {"challenge": "Trim", "response": "AS REQUIRED"},
+        {"challenge": "Mixture", "response": "LEAN FOR CRUISE"},
+        {"challenge": "Landing light", "response": "AS REQUIRED"},
+        {"challenge": "Heading indicator", "response": "CROSS-CHECK"}
+      ]
+    },
+    {
+      "name": "Descent",
+      "group": "Normal",
+      "items": [
+        {"challenge": "ASOS / ATIS", "response": "OBTAIN"},
+        {"challenge": "Altimeter", "response": "SET"},
+        {"challenge": "Arrival / passenger briefing", "response": "COMPLETE"},
+        {"challenge": "Mixture", "response": "ADJUST AS REQUIRED"},
+        {"challenge": "Power", "response": "AS REQUIRED"},
+        {"challenge": "Landing light", "response": "ON"},
+        {"challenge": "Wing flaps", "response": "AS REQUIRED"},
+        {"challenge": "Fuel selector valve", "response": "BOTH"}
+      ]
+    },
+    {
+      "name": "Before Landing",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Seats, belts, shoulder harnesses", "response": "ADJUST & LOCKED"},
+        {"challenge": "Mixture", "response": "AS REQUIRED"},
+        {"challenge": "Autopilot", "response": "OFF"}
+      ]
+    },
+    {
+      "name": "Normal Landing",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Power", "response": "AS REQUIRED"},
+        {"challenge": "Airspeed (flaps up)", "response": "70 KIAS"},
+        {"challenge": "Wing flaps", "response": "AS REQUIRED"},
+        {"challenge": "Airspeed (flaps down)", "response": "65 KIAS"},
+        {"challenge": "Touchdown", "response": "MAIN WHEELS FIRST"},
+        {"challenge": "Brakes", "response": "APPLY AS NECESSARY"}
+      ]
+    },
+    {
+      "name": "Short Field Landing",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Power", "response": "AS REQUIRED"},
+        {"challenge": "Wing flaps", "response": "30°"},
+        {"challenge": "Airspeed", "response": "61 KIAS"},
+        {"challenge": "Touchdown", "response": "MAIN WHEELS FIRST"},
+        {"challenge": "Wing flaps", "response": "RETRACT"},
+        {"challenge": "Brakes", "response": "APPLY AS NECESSARY"}
+      ]
+    },
+    {
+      "name": "Soft Field Landing",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Power", "response": "AS REQUIRED"},
+        {"challenge": "Wing flaps", "response": "30°"},
+        {"challenge": "Airspeed", "response": "65 KIAS"},
+        {"challenge": "Touchdown", "response": "MAIN WHEELS FIRST"},
+        {"challenge": "Landing roll", "response": "TAIL LOW"}
+      ]
+    },
+    {
+      "name": "Go-Around (Balked Landing)",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Throttle", "response": "FULL OPEN", "memory": true},
+        {"challenge": "Wing flaps", "response": "RETRACT TO 20°", "memory": true},
+        {"challenge": "Climb speed", "response": "60 KIAS", "memory": true},
+        {"challenge": "Wing flaps", "response": "10°", "memory": true},
+        {"challenge": "Wing flaps (obstacles cleared)", "response": "RETRACT", "memory": true}
+      ]
+    },
+    {
+      "name": "After Landing",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Flaps", "response": "UP"},
+        {"challenge": "Mixture", "response": "LEAN FOR TAXI"},
+        {"challenge": "Landing light", "response": "OFF"},
+        {"challenge": "Strobes", "response": "OFF"},
+        {"challenge": "Transponder", "response": "STANDBY"},
+        {"challenge": "Taxi clearance / advisory", "response": "CONTACT"}
+      ]
+    },
+    {
+      "name": "Securing Airplane",
+      "group": "Normal",
+      "items": [
+        {"challenge": "Avionics master switch", "response": "OFF"},
+        {"challenge": "Throttle", "response": "IDLE"},
+        {"challenge": "Magnetos", "response": "CHECK GROUNDING"},
+        {"challenge": "Throttle", "response": "1000 RPM"},
+        {"challenge": "Mixture", "response": "IDLE CUT-OFF"},
+        {"challenge": "Ignition", "response": "OFF"},
+        {"challenge": "Master switch", "response": "OFF"},
+        {"challenge": "Beacon", "response": "OFF"},
+        {"challenge": "Fuel selector", "response": "LEFT or RIGHT"},
+        {"challenge": "Control lock", "response": "INSTALL"},
+        {"challenge": "Flight information", "response": "RECORD"},
+        {"challenge": "Pitot tube cover", "response": "INSTALL"},
+        {"challenge": "Wheel chocks and tie-downs", "response": "SECURE"},
+        {"challenge": "Post-flight walk-around", "response": "COMPLETE"},
+        {"challenge": "Doors", "response": "LOCKED"}
+      ]
+    },
+    {
+      "name": "Engine Failure After Takeoff",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Airspeed (flaps up)", "response": "70 KIAS", "memory": true},
+        {"challenge": "Airspeed (flaps down)", "response": "65 KIAS", "memory": true},
+        {"challenge": "Mixture", "response": "IDLE CUT-OFF", "memory": true},
+        {"challenge": "Fuel shutoff valve", "response": "OFF", "memory": true},
+        {"challenge": "Ignition switch", "response": "OFF", "memory": true},
+        {"challenge": "Flaps", "response": "AS REQUIRED", "memory": true},
+        {"challenge": "Master switch", "response": "OFF", "memory": true},
+        {"challenge": "Cabin door", "response": "UNLATCH", "memory": true},
+        {"challenge": "Land", "response": "STRAIGHT AHEAD", "memory": true}
+      ]
+    },
+    {
+      "name": "Engine Failure in Flight",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Airspeed (best glide)", "response": "68 KIAS", "memory": true},
+        {"challenge": "Fuel shutoff valve", "response": "ON", "memory": true},
+        {"challenge": "Fuel selector valve", "response": "BOTH", "memory": true},
+        {"challenge": "Aux fuel pump", "response": "ON", "memory": true},
+        {"challenge": "Mixture", "response": "RICH", "memory": true},
+        {"challenge": "Magnetos", "response": "CHECK BOTH", "memory": true},
+        {"kind": "note", "challenge": "If power is restored:"},
+        {"challenge": "Aux fuel pump", "response": "OFF"},
+        {"challenge": "Fuel flow", "response": "MONITOR"}
+      ]
+    },
+    {
+      "name": "Emergency Landing Without Power",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Airspeed (best glide)", "response": "68 KIAS", "memory": true},
+        {"challenge": "Landing site", "response": "DETERMINE", "memory": true},
+        {"challenge": "Seats, belts, harnesses", "response": "SECURE"},
+        {"challenge": "Mixture", "response": "IDLE CUT-OFF"},
+        {"challenge": "Fuel shutoff valve", "response": "OFF"},
+        {"challenge": "Ignition switch", "response": "OFF"},
+        {"challenge": "Flaps (30° recommended)", "response": "AS REQUIRED"},
+        {"challenge": "Master switch", "response": "OFF"},
+        {"challenge": "Doors", "response": "UNLATCH"},
+        {"challenge": "Touchdown", "response": "SLIGHTLY TAIL LOW"},
+        {"challenge": "Brakes", "response": "APPLY AS NECESSARY"}
+      ]
+    },
+    {
+      "name": "Precautionary Landing With Power",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Seats, belts, harnesses", "response": "SECURE"},
+        {"challenge": "Airspeed", "response": "65 KIAS"},
+        {"challenge": "Wing flaps", "response": "20°"},
+        {"challenge": "Selected field", "response": "FLY OVER & INSPECT"},
+        {"challenge": "Avionics master switch", "response": "OFF"},
+        {"challenge": "Flaps (30° recommended)", "response": "AS REQUIRED"},
+        {"challenge": "Airspeed", "response": "65 KIAS"},
+        {"challenge": "Master switch", "response": "OFF"},
+        {"challenge": "Doors", "response": "UNLATCH"},
+        {"challenge": "Touchdown", "response": "SLIGHTLY TAIL LOW"},
+        {"challenge": "Ignition switch", "response": "OFF"},
+        {"challenge": "Brakes", "response": "APPLY AS NECESSARY"}
+      ]
+    },
+    {
+      "name": "Fire During Engine Start",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Cranking", "response": "CONTINUE", "memory": true},
+        {"kind": "note", "challenge": "If engine starts:"},
+        {"challenge": "Power", "response": "1800 RPM", "memory": true},
+        {"challenge": "Engine", "response": "SHUTDOWN", "memory": true},
+        {"kind": "note", "challenge": "If engine fails to start:"},
+        {"challenge": "Throttle", "response": "FULL OPEN", "memory": true},
+        {"challenge": "Mixture", "response": "IDLE CUT-OFF", "memory": true},
+        {"challenge": "Cranking", "response": "CONTINUE", "memory": true},
+        {"challenge": "Fuel shutoff valve", "response": "OFF", "memory": true},
+        {"challenge": "Aux fuel pump", "response": "OFF", "memory": true},
+        {"challenge": "Master switch", "response": "OFF", "memory": true},
+        {"challenge": "Ignition switch", "response": "OFF", "memory": true},
+        {"challenge": "Fire extinguisher", "response": "OBTAIN", "memory": true}
+      ]
+    },
+    {
+      "name": "Engine Fire in Flight",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Mixture", "response": "IDLE CUT-OFF", "memory": true},
+        {"challenge": "Fuel shutoff valve", "response": "OFF", "memory": true},
+        {"challenge": "Aux fuel pump", "response": "OFF", "memory": true},
+        {"challenge": "Master switch", "response": "OFF", "memory": true},
+        {"challenge": "Cabin heat and air", "response": "CLOSED", "memory": true},
+        {"challenge": "Wing root vents", "response": "OPEN"},
+        {"challenge": "Airspeed", "response": "100+ KIAS"},
+        {"challenge": "Forced landing", "response": "EXECUTE"},
+        {"kind": "note", "challenge": "Refer to 'Emergency Landing Without Power' if time permits."}
+      ]
+    },
+    {
+      "name": "Electrical Fire in Flight",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Master switch", "response": "OFF", "memory": true},
+        {"challenge": "Vents, cabin heat and air", "response": "CLOSED", "memory": true},
+        {"challenge": "Fire extinguisher", "response": "ACTIVATE", "memory": true},
+        {"challenge": "Avionics master switch", "response": "OFF"},
+        {"challenge": "All electrical switches (except ignition)", "response": "OFF"},
+        {"kind": "note", "challenge": "If fire appears out:"},
+        {"challenge": "Vents / cabin air / heat", "response": "OPEN"},
+        {"challenge": "Master switch", "response": "ON"},
+        {"challenge": "Circuit breakers", "response": "CHECK — DO NOT RESET"},
+        {"challenge": "Radio switches", "response": "OFF"},
+        {"challenge": "Avionics master switch", "response": "ON"},
+        {"challenge": "Radio / electrical switches", "response": "ON, ONE AT A TIME"}
+      ]
+    },
+    {
+      "name": "Cabin Fire",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Master switch", "response": "OFF", "memory": true},
+        {"challenge": "Vents, cabin heat and air", "response": "CLOSED", "memory": true},
+        {"challenge": "Fire extinguisher (if available)", "response": "ACTIVATE", "memory": true},
+        {"challenge": "Forced landing", "response": "EXECUTE"},
+        {"kind": "note", "challenge": "Refer to 'Emergency Landing Without Power' if time permits."}
+      ]
+    },
+    {
+      "name": "Wing Fire",
+      "group": "Emergency",
+      "items": [
+        {"challenge": "Landing / taxi light switch", "response": "OFF", "memory": true},
+        {"challenge": "Navigation light switch", "response": "OFF", "memory": true},
+        {"challenge": "Strobe light switch", "response": "OFF", "memory": true},
+        {"challenge": "Pitot heat switch", "response": "OFF", "memory": true},
+        {"kind": "note", "challenge": "Side-slip to keep flames away from the fuel tank and cabin. Land as soon as possible with flaps retracted."}
+      ]
+    },
+    {
+      "name": "Flooded Engine Start",
+      "group": "Abnormal",
+      "items": [
+        {"challenge": "Mixture", "response": "IDLE CUT-OFF"},
+        {"challenge": "Throttle", "response": "FULL OPEN"},
+        {"challenge": "Beacon", "response": "ON"},
+        {"challenge": "Battery switch", "response": "ON"},
+        {"challenge": "Aux fuel pump", "response": "OFF"},
+        {"kind": "note", "challenge": "Continue from 'Propeller area — CLEAR' in the Starting Engine checklist."}
+      ]
+    },
+    {
+      "name": "Excessive Rate of Charge",
+      "group": "Abnormal",
+      "items": [
+        {"challenge": "Alternator", "response": "OFF"},
+        {"challenge": "Nonessential electrical equipment", "response": "OFF"},
+        {"challenge": "Flight", "response": "LAND AS SOON AS PRACTICAL"}
+      ]
+    },
+    {
+      "name": "Low Voltage Annunciator",
+      "group": "Abnormal",
+      "items": [
+        {"challenge": "Avionics master switch", "response": "OFF"},
+        {"challenge": "Alternator circuit breaker", "response": "CHECK IN"},
+        {"challenge": "Master switch (both sides)", "response": "OFF, THEN ON"},
+        {"challenge": "Low voltage light", "response": "CHECK OFF"},
+        {"challenge": "Avionics master switch", "response": "ON"},
+        {"kind": "note", "challenge": "If low voltage annunciator illuminates again:"},
+        {"challenge": "Alternator", "response": "OFF"},
+        {"challenge": "Nonessential electrical equipment", "response": "OFF"},
+        {"challenge": "Flight", "response": "TERMINATE"}
+      ]
+    },
+    {
+      "name": "Landing With Flat Main Tire",
+      "group": "Abnormal",
+      "items": [
+        {"challenge": "Flaps", "response": "AS REQUIRED"},
+        {"challenge": "Approach", "response": "NORMAL"},
+        {"challenge": "Touchdown", "response": "GOOD TIRE FIRST"},
+        {"challenge": "Directional control", "response": "MAINTAIN (brake on good tire)"}
+      ]
+    },
+    {
+      "name": "Landing With Flat Nose Tire",
+      "group": "Abnormal",
+      "items": [
+        {"challenge": "Approach", "response": "NORMAL"},
+        {"challenge": "Flaps", "response": "AS REQUIRED"},
+        {"challenge": "Touchdown", "response": "ON MAINS"},
+        {"challenge": "Elevator", "response": "DELAY NOSE GEAR CONTACT"},
+        {"kind": "note", "challenge": "Maintain full aft elevator deflection during ground roll."}
+      ]
+    }
+  ]
+}
