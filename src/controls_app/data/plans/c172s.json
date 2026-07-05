@@ -1,0 +1,67 @@
+{
+  "aircraft_key": "c172s",
+  "aircraft_name": "Cessna 172S Skyhawk",
+  "summary": "Single-engine, fixed-pitch propeller, fixed gear. Two axes fly it (throttle + mixture); the Alpha's switch panel mirrors the real 172 electrical panel almost one-to-one, which makes it a superb procedure trainer.",
+  "aircraft_notes": "The 172S has a FIXED-PITCH prop: the Bravo's blue propeller lever does nothing on this aircraft — deliberately leave it unbound and physically remove or ignore the blue handle. The gear is fixed too, so leave the Bravo gear lever unbound (or you will eventually rip the gear out of a retractable by habit — better to build the habit only where it belongs). Fuel selector (BOTH/L/R) and fuel shutoff are best clicked in the cockpit so you look at them like the checklist tells you to.",
+  "coaching": [
+    "In MSFS 2024 open Options → Controls. Create a NEW profile per device named 'C172' (bottom of the device tab) so these bindings don't disturb other aircraft profiles.",
+    "Clear the defaults you replace: search the action, click the binding slot, 'Clear current input', then press/move your hardware with 'Start scanning' to capture it.",
+    "Set sensitivity on yoke pitch/roll to about -30% and a 3-5% dead zone; the real 172 is heavier in pitch than any desktop yoke.",
+    "Turn OFF Assisted Rudder and Auto-Rudder (Assistance Options → Piloting) or your pedals will fight the AI.",
+    "Fly the checklist with the hardware: Before Start = BAT then AVIONICS on the Alpha panel; Start = magneto rotary to START and release to BOTH; Run-up = throttle to 1800 RPM, mag check on the rotary, back to 1000.",
+    "Takeoff flow: strobe/landing lights on (Alpha panel), transponder ALT (click), throttle full, right rudder as the nose comes up, rotate 55 KIAS, trim wheel until the nose stays put hands-off at 74-79 KIAS.",
+    "Approach: power to ~1500 RPM abeam the numbers, one notch of flaps per leg on the Bravo flap lever, trim every configuration change — the trim wheel is the most-used control in the aircraft.",
+    "Go-around: firewall the throttle (or press the GA button), carb-free 172S just needs full power, flaps up in stages with the flap lever, then climb at 60-65 KIAS."
+  ],
+  "devices": {
+    "honeycomb_alpha": [
+      {"control": "Yoke roll (X axis)", "assignment": "Aileron axis", "msfs_setting": "AILERONS AXIS", "usage_tip": "Small corrections; the 172 wants rudder with every roll input.", "priority": "essential"},
+      {"control": "Yoke pitch (Y axis)", "assignment": "Elevator axis", "msfs_setting": "ELEVATOR AXIS", "usage_tip": "Trim off the pressure instead of holding it — see trim wheel on the Bravo.", "priority": "essential"},
+      {"control": "Red button (left horn)", "assignment": "Autopilot disconnect", "msfs_setting": "AUTOPILOT OFF / DISCONNECT", "usage_tip": "Same place as the real AP disconnect. Press before hand-flying the approach (Before Landing checklist: Autopilot — OFF).", "priority": "essential"},
+      {"control": "8-way hat (left thumb)", "assignment": "Cockpit look / POV", "msfs_setting": "COCKPIT LOOK (POV)", "usage_tip": "Scan for traffic before every turn in the pattern.", "priority": "recommended"},
+      {"control": "Vertical rocker (right thumb)", "assignment": "Elevator trim up/down (backup)", "msfs_setting": "ELEVATOR TRIM UP / DOWN", "usage_tip": "Fine trim while your right hand is on the throttle; big trim changes go to the Bravo wheel.", "priority": "recommended"},
+      {"control": "BAT rocker (switch panel)", "assignment": "Master battery", "msfs_setting": "TOGGLE MASTER BATTERY", "usage_tip": "First switch ON in Before Start, last OFF at shutdown — exactly like the checklist.", "priority": "essential"},
+      {"control": "ALT rocker (switch panel)", "assignment": "Master alternator", "msfs_setting": "TOGGLE MASTER ALTERNATOR", "usage_tip": "ON after engine start ('Alternator — ON'), OFF for the electrical-fire memory items.", "priority": "essential"},
+      {"control": "AVIONICS BUS 1 rocker", "assignment": "Avionics master 1", "msfs_setting": "TOGGLE AVIONICS MASTER 1", "usage_tip": "Avionics ON only after start (voltage spikes kill radios — that's why the checklist orders it).", "priority": "essential"},
+      {"control": "AVIONICS BUS 2 rocker", "assignment": "Avionics master 2", "msfs_setting": "TOGGLE AVIONICS MASTER 2", "usage_tip": "Pairs with BUS 1 in the same checklist step.", "priority": "recommended"},
+      {"control": "BCN light rocker", "assignment": "Beacon light", "msfs_setting": "TOGGLE BEACON LIGHTS", "usage_tip": "Beacon ON before engine start — it warns people the prop is about to turn.", "priority": "essential"},
+      {"control": "LAND light rocker", "assignment": "Landing light", "msfs_setting": "LANDING LIGHTS TOGGLE", "usage_tip": "ON for takeoff, landing, and below 10,000 ft in the descent checklist.", "priority": "essential"},
+      {"control": "TAXI light rocker", "assignment": "Taxi light", "msfs_setting": "TOGGLE TAXI LIGHTS", "usage_tip": "ON to taxi, OFF when you hold short so the tower isn't blinded.", "priority": "recommended"},
+      {"control": "NAV light rocker", "assignment": "Nav lights", "msfs_setting": "TOGGLE NAV LIGHTS", "usage_tip": "ON whenever the engine runs (night: always).", "priority": "recommended"},
+      {"control": "STROBE light rocker", "assignment": "Strobe lights", "msfs_setting": "TOGGLE STROBES", "usage_tip": "ON entering the runway, OFF leaving it — 'Cleared for Takeoff: Lights'.", "priority": "essential"},
+      {"control": "Ignition rotary (OFF/R/L/BOTH/START)", "assignment": "Magnetos + starter", "msfs_setting": "MAGNETO OFF / RIGHT / LEFT / BOTH / START (per position)", "usage_tip": "Run-up mag check exactly like the POH: BOTH → R (note drop) → BOTH → L (note drop) → BOTH. Max 125 RPM drop, 50 difference.", "priority": "essential"}
+    ],
+    "honeycomb_bravo": [
+      {"control": "Lever 1 (black — throttle handle)", "assignment": "Throttle axis", "msfs_setting": "THROTTLE AXIS", "usage_tip": "1000 RPM after start, 1800 for the run-up, full for takeoff, ~1500 abeam the numbers.", "priority": "essential"},
+      {"control": "Lever 2 (blue — propeller handle)", "assignment": "LEAVE UNBOUND (fixed-pitch prop)", "msfs_setting": "—", "usage_tip": "The 172S has no prop control. Leaving it unbound is the correct 'binding'.", "priority": "essential"},
+      {"control": "Lever 3 (red — mixture handle)", "assignment": "Mixture axis", "msfs_setting": "MIXTURE AXIS", "usage_tip": "Full rich for start/takeoff/landing, lean for taxi and cruise, idle cut-off to shut down — the checklist uses it constantly.", "priority": "essential"},
+      {"control": "GA button (back of throttle handle)", "assignment": "TO/GA — go around", "msfs_setting": "AUTO THROTTLE GO AROUND / TOGA", "usage_tip": "Balked landing memory item: full power without repositioning your hand.", "priority": "recommended"},
+      {"control": "Trim wheel", "assignment": "Elevator trim", "msfs_setting": "ELEVATOR TRIM AXIS (or TRIM UP/DOWN)", "usage_tip": "Spins just like the 172's wheel between the seats. Trim after every power or flap change.", "priority": "essential"},
+      {"control": "Flap lever", "assignment": "Flaps up / down (notched)", "msfs_setting": "INCREASE / DECREASE FLAPS", "usage_tip": "One click = one notch: 10° on downwind, 20° base, 30° final (65 KIAS).", "priority": "essential"},
+      {"control": "Landing gear lever", "assignment": "LEAVE UNBOUND (fixed gear)", "msfs_setting": "—", "usage_tip": "Fixed gear — save the muscle memory for a retractable.", "priority": "recommended"},
+      {"control": "AUTO PILOT button", "assignment": "Autopilot master", "msfs_setting": "TOGGLE AUTOPILOT MASTER", "usage_tip": "Engage in cruise; the Before Landing checklist turns it off.", "priority": "recommended"},
+      {"control": "HDG button", "assignment": "AP heading hold", "msfs_setting": "TOGGLE AUTOPILOT HEADING HOLD", "usage_tip": "Fly assigned headings; bug set with the selector knob.", "priority": "recommended"},
+      {"control": "NAV button", "assignment": "AP nav hold", "msfs_setting": "TOGGLE AUTOPILOT NAV1 HOLD", "usage_tip": "Track the GPS/VOR course in cruise.", "priority": "recommended"},
+      {"control": "APR button", "assignment": "AP approach hold", "msfs_setting": "TOGGLE AUTOPILOT APPROACH HOLD", "usage_tip": "Couples an ILS/RNAV — practice, but hand-fly the last 500 ft.", "priority": "optional"},
+      {"control": "ALT button", "assignment": "AP altitude hold", "msfs_setting": "TOGGLE AUTOPILOT ALTITUDE HOLD", "usage_tip": "Level-off helper while you manage the checklist.", "priority": "recommended"},
+      {"control": "VS button", "assignment": "AP vertical speed", "msfs_setting": "TOGGLE AUTOPILOT VS HOLD", "usage_tip": "500 fpm descents for passenger-friendly arrivals.", "priority": "optional"},
+      {"control": "Rotary selector (IAS/CRS/HDG/VS/ALT)", "assignment": "Chooses what the knob edits", "msfs_setting": "(built into Bravo profile — bind knob per selection)", "usage_tip": "Select ALT, spin the knob to the assigned altitude, then HDG for the bug.", "priority": "recommended"},
+      {"control": "Increase/decrease knob", "assignment": "Edit selected AP value", "msfs_setting": "HEADING BUG INC/DEC, AP ALT VAR INC/DEC, VS VAR INC/DEC, COURSE INC/DEC", "usage_tip": "Bind each pair with the selector in the matching position.", "priority": "recommended"},
+      {"control": "Rocker switch 1", "assignment": "Aux fuel pump", "msfs_setting": "TOGGLE ELECTRIC FUEL PUMP", "usage_tip": "ON during priming per Starting Engine, OFF after — and ON again for Engine Failure in Flight.", "priority": "essential"},
+      {"control": "Rocker switch 2", "assignment": "Pitot heat", "msfs_setting": "TOGGLE PITOT HEAT", "usage_tip": "Preflight test and any visible moisture / cold IMC.", "priority": "recommended"},
+      {"control": "Rocker switch 3", "assignment": "Cabin heat", "msfs_setting": "(clickable in cockpit if no binding)", "usage_tip": "CLOSED is a fire memory item — know where it is.", "priority": "optional"}
+    ],
+    "velocityone_rudder": [
+      {"control": "Rudder axis (slide pedals)", "assignment": "Rudder axis", "msfs_setting": "RUDDER AXIS", "usage_tip": "Right rudder on takeoff and in every climb (P-factor); step on the ball in turns.", "priority": "essential"},
+      {"control": "Left toe brake", "assignment": "Left brake axis", "msfs_setting": "LEFT BRAKE AXIS", "usage_tip": "Brake check first movement ('Taxi: Brakes — CHECK'); differential braking for tight turns.", "priority": "essential"},
+      {"control": "Right toe brake", "assignment": "Right brake axis", "msfs_setting": "RIGHT BRAKE AXIS", "usage_tip": "Touchdown: main wheels first, brake gently, heels on the floor until you need them.", "priority": "essential"}
+    ],
+    "keyboard_mouse": [
+      {"control": "Mouse", "assignment": "Cockpit interaction (default)", "msfs_setting": "(default 'Cockpit interaction' bindings)", "usage_tip": "Fuel selector, fuel shutoff, transponder and radios stay mouse-clicked on purpose — the checklist wants your eyes on them.", "priority": "essential"},
+      {"control": "B key", "assignment": "Set altimeter to local pressure", "msfs_setting": "SET ALTIMETER", "usage_tip": "Descent checklist: 'Altimeter — SET' after getting ATIS.", "priority": "recommended"},
+      {"control": "Pause key", "assignment": "Active pause", "msfs_setting": "TOGGLE ACTIVE PAUSE", "usage_tip": "Freeze the plane mid-air to study a checklist phase without losing the setup.", "priority": "recommended"},
+      {"control": "Ctrl+P", "assignment": "Parking brake", "msfs_setting": "TOGGLE PARKING BRAKES", "usage_tip": "Set before the run-up ('Brakes — SET & HOLD'), release when cleared.", "priority": "recommended"},
+      {"control": "Ctrl+Alt+1..4 / Alt+1..4", "assignment": "Save / recall custom cameras", "msfs_setting": "SAVE CUSTOM CAMERA / LOAD CUSTOM CAMERA", "usage_tip": "Save views of the panel, the mags, and the fuel selector so checklist items are one keypress away.", "priority": "optional"}
+    ]
+  }
+}

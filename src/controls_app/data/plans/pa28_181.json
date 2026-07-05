@@ -1,0 +1,62 @@
+{
+  "aircraft_key": "pa28_181",
+  "aircraft_name": "Piper PA-28-181 Archer II",
+  "summary": "Low-wing, single-engine, fixed-pitch, fixed gear — like the 172 it flies on throttle + mixture, but it adds two habits the Cessna doesn't teach: carburetor heat and switching fuel tanks (LEFT/RIGHT only, no BOTH).",
+  "aircraft_notes": "Fixed-pitch prop: leave the Bravo's blue prop lever unbound. Fixed gear: leave the gear lever unbound. The Archer's carburetor ices — carb heat gets a dedicated switch and shows up in the Descent, Approach, Engine Roughness and Engine Failure checklists. The fuel selector has NO 'BOTH' position: you must switch tanks in cruise (checklist: 'Fuel selector — switch tanks as needed') and select the FULLEST tank before landing, so keep it mouse-clicked on the panel where you can see it. The electric fuel pump is ON for every takeoff and landing.",
+  "coaching": [
+    "Create a separate 'PA-28' controls profile per device in Options → Controls so the Archer's carb-heat and fuel-pump bindings don't collide with your 172 profile.",
+    "Sensitivity: the Archer is lighter in roll than the 172 — around -25% on ailerons, -30% on pitch, small dead zones.",
+    "Before Start with hardware: BAT on (Alpha), fuel selector DESIRED TANK (mouse — look at it!), then Engine Start: fuel pump ON (Bravo switch), mixture full rich (red lever), crank with the rotary.",
+    "Run-up at 2000 RPM (not 1800 like the 172): mags max 175 drop/50 diff, carb heat ON then OFF — watch for the RPM drop that proves it works.",
+    "Takeoff: fuel pump ON, flaps up (normal) or 25° (short field), rotate 55-60 KIAS, climb Vy 76 KIAS.",
+    "Cruise: fuel pump OFF, lean the red lever, and set a timer — switch tanks every 30 minutes so the wings stay balanced.",
+    "Approach (the Archer flow): carb heat ON as required, fullest tank, mixture rich, fuel pump ON, landing light ON — then flaps a notch per leg, 70 KIAS final, 65 over the numbers.",
+    "Go-around: full throttle, carb heat OFF (cold), flaps to 25° immediately, climb 65+, then bleed the flaps up slowly — the Archer sinks if you dump them."
+  ],
+  "devices": {
+    "honeycomb_alpha": [
+      {"control": "Yoke roll (X axis)", "assignment": "Aileron axis", "msfs_setting": "AILERONS AXIS", "usage_tip": "The low wing rolls quicker than a 172 — smaller inputs.", "priority": "essential"},
+      {"control": "Yoke pitch (Y axis)", "assignment": "Elevator axis", "msfs_setting": "ELEVATOR AXIS", "usage_tip": "Trim to 76 KIAS in the climb and it will hold it hands-off.", "priority": "essential"},
+      {"control": "Red button (left horn)", "assignment": "Autopilot disconnect", "msfs_setting": "AUTOPILOT OFF / DISCONNECT", "usage_tip": "Off before the approach — the checklist assumes you hand-fly the landing.", "priority": "essential"},
+      {"control": "8-way hat (left thumb)", "assignment": "Cockpit look / POV", "msfs_setting": "COCKPIT LOOK (POV)", "usage_tip": "The low wing hides traffic in turns — lift a wing and look before turning.", "priority": "recommended"},
+      {"control": "Vertical rocker (right thumb)", "assignment": "Elevator trim up/down (backup)", "msfs_setting": "ELEVATOR TRIM UP / DOWN", "usage_tip": "Fine adjustments on final.", "priority": "recommended"},
+      {"control": "BAT rocker (switch panel)", "assignment": "Master battery", "msfs_setting": "TOGGLE MASTER BATTERY", "usage_tip": "'Master switch — ON' in preflight, OFF in Emergency Landing memory items.", "priority": "essential"},
+      {"control": "ALT rocker (switch panel)", "assignment": "Master alternator", "msfs_setting": "TOGGLE MASTER ALTERNATOR", "usage_tip": "OFF/ON cycle is the Low Voltage Light procedure.", "priority": "essential"},
+      {"control": "AVIONICS BUS 1 rocker", "assignment": "Avionics master", "msfs_setting": "TOGGLE AVIONICS MASTER 1", "usage_tip": "ON after start, OFF before shutdown ('Electrical equipment / avionics — OFF').", "priority": "essential"},
+      {"control": "BCN light rocker", "assignment": "Beacon light", "msfs_setting": "TOGGLE BEACON LIGHTS", "usage_tip": "'Strobes / beacon — ON' before engine start.", "priority": "essential"},
+      {"control": "LAND light rocker", "assignment": "Landing light", "msfs_setting": "LANDING LIGHTS TOGGLE", "usage_tip": "ON at Run-up ('Landing light — ON'), OFF in Climb/Cruise, ON again for Approach.", "priority": "essential"},
+      {"control": "NAV light rocker", "assignment": "Nav lights", "msfs_setting": "TOGGLE NAV LIGHTS", "usage_tip": "Wing Fire memory item turns these OFF.", "priority": "recommended"},
+      {"control": "STROBE light rocker", "assignment": "Strobe lights", "msfs_setting": "TOGGLE STROBES", "usage_tip": "'Strobes — ON' in the Run-up checklist, before taking the runway.", "priority": "essential"},
+      {"control": "Ignition rotary (OFF/R/L/BOTH/START)", "assignment": "Magnetos + starter", "msfs_setting": "MAGNETO OFF / RIGHT / LEFT / BOTH / START (per position)", "usage_tip": "Run-up mag check: 175 max drop, 50 max difference. Engine Roughness checklist: L — R — BOTH on this rotary.", "priority": "essential"}
+    ],
+    "honeycomb_bravo": [
+      {"control": "Lever 1 (black — throttle handle)", "assignment": "Throttle axis", "msfs_setting": "THROTTLE AXIS", "usage_tip": "800-1000 RPM after start, 2000 for run-up, full for takeoff, 1700 abeam the numbers (75 KIAS).", "priority": "essential"},
+      {"control": "Lever 2 (blue — propeller handle)", "assignment": "LEAVE UNBOUND (fixed-pitch prop)", "msfs_setting": "—", "usage_tip": "The Archer II has no prop lever.", "priority": "essential"},
+      {"control": "Lever 3 (red — mixture handle)", "assignment": "Mixture axis", "msfs_setting": "MIXTURE AXIS", "usage_tip": "Full rich for start and landing, lean for taxi and cruise, idle cut-off shuts the engine down.", "priority": "essential"},
+      {"control": "GA button (back of throttle handle)", "assignment": "TO/GA — go around", "msfs_setting": "AUTO THROTTLE GO AROUND / TOGA", "usage_tip": "Full power instantly for the go-around, then carb heat OFF with the switch below.", "priority": "recommended"},
+      {"control": "Trim wheel", "assignment": "Elevator trim", "msfs_setting": "ELEVATOR TRIM AXIS (or TRIM UP/DOWN)", "usage_tip": "The Archer's trim is between the seats like this wheel — retrim after every flap notch.", "priority": "essential"},
+      {"control": "Flap lever", "assignment": "Flaps up / down (notched)", "msfs_setting": "INCREASE / DECREASE FLAPS", "usage_tip": "Three notches (10/25/40). The real Archer uses a Johnson bar — pull decisively, one notch per pattern leg.", "priority": "essential"},
+      {"control": "Landing gear lever", "assignment": "LEAVE UNBOUND (fixed gear)", "msfs_setting": "—", "usage_tip": "'U — Undercarriage: fixed, verify' — the checklist item is a look, not a lever.", "priority": "recommended"},
+      {"control": "AUTO PILOT button", "assignment": "Autopilot master", "msfs_setting": "TOGGLE AUTOPILOT MASTER", "usage_tip": "Cruise workload relief while you run tank-switch timers.", "priority": "recommended"},
+      {"control": "HDG button", "assignment": "AP heading hold", "msfs_setting": "TOGGLE AUTOPILOT HEADING HOLD", "usage_tip": "Heading bug flying for VFR navigation practice.", "priority": "recommended"},
+      {"control": "NAV button", "assignment": "AP nav hold", "msfs_setting": "TOGGLE AUTOPILOT NAV1 HOLD", "usage_tip": "Track VORs — the Archer II panel is classic radio-nav training.", "priority": "optional"},
+      {"control": "ALT button", "assignment": "AP altitude hold", "msfs_setting": "TOGGLE AUTOPILOT ALTITUDE HOLD", "usage_tip": "Hold altitude while leaning and switching tanks.", "priority": "recommended"},
+      {"control": "Increase/decrease knob", "assignment": "Edit selected AP value", "msfs_setting": "HEADING BUG INC/DEC, AP ALT VAR INC/DEC", "usage_tip": "Bind with the rotary selector in HDG and ALT positions.", "priority": "recommended"},
+      {"control": "Rocker switch 1", "assignment": "Electric fuel pump", "msfs_setting": "TOGGLE ELECTRIC FUEL PUMP", "usage_tip": "ON for start, takeoff and landing; OFF in cruise with a pressure check — it's in almost every Archer checklist.", "priority": "essential"},
+      {"control": "Rocker switch 2", "assignment": "Carburetor heat", "msfs_setting": "TOGGLE CARBURETOR HEAT (ANTI-ICE)", "usage_tip": "ON before reducing power for descent, ON at the first sign of engine roughness — the Archer's signature emergency habit.", "priority": "essential"},
+      {"control": "Rocker switch 3", "assignment": "Pitot heat", "msfs_setting": "TOGGLE PITOT HEAT", "usage_tip": "Preflight test; IFR item in the run-up.", "priority": "recommended"}
+    ],
+    "velocityone_rudder": [
+      {"control": "Rudder axis (slide pedals)", "assignment": "Rudder axis", "msfs_setting": "RUDDER AXIS", "usage_tip": "The Archer needs less rudder than the 172 but still wants it in the climb; slips work beautifully for gusty no-flap landings.", "priority": "essential"},
+      {"control": "Left toe brake", "assignment": "Left brake axis", "msfs_setting": "LEFT BRAKE AXIS", "usage_tip": "'Brakes — check both sides' is the first taxi item.", "priority": "essential"},
+      {"control": "Right toe brake", "assignment": "Right brake axis", "msfs_setting": "RIGHT BRAKE AXIS", "usage_tip": "Short-field: brakes held until full throttle, released together.", "priority": "essential"}
+    ],
+    "keyboard_mouse": [
+      {"control": "Mouse", "assignment": "Cockpit interaction (default)", "msfs_setting": "(default 'Cockpit interaction' bindings)", "usage_tip": "Fuel selector (LEFT/RIGHT — no BOTH!), primer, and radios stay mouse-operated: the checklist wants you to look at the selector when you switch tanks.", "priority": "essential"},
+      {"control": "B key", "assignment": "Set altimeter", "msfs_setting": "SET ALTIMETER", "usage_tip": "'ATIS / altimeter — obtain / set' in Engine Start and Descent.", "priority": "recommended"},
+      {"control": "Pause key", "assignment": "Active pause", "msfs_setting": "TOGGLE ACTIVE PAUSE", "usage_tip": "Freeze mid-flight and walk the emergency flows with the checklist app.", "priority": "recommended"},
+      {"control": "Ctrl+P", "assignment": "Parking brake", "msfs_setting": "TOGGLE PARKING BRAKES", "usage_tip": "'Parking brake — SET' opens the run-up checklist.", "priority": "recommended"},
+      {"control": "Ctrl+Alt+1..4 / Alt+1..4", "assignment": "Save / recall custom cameras", "msfs_setting": "SAVE CUSTOM CAMERA / LOAD CUSTOM CAMERA", "usage_tip": "Save a fuel-selector camera — you'll use it every 30 minutes in cruise.", "priority": "optional"}
+    ]
+  }
+}

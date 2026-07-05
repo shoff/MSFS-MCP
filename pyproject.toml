@@ -20,12 +20,22 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4"]
+checklist = ["PyQt6>=6.6"]
+controls = ["PyQt6>=6.6", "anthropic>=0.40", "pygame>=2.5"]
 
 [project.scripts]
 msfs-mcp = "msfs_mcp.server:main"
 
+[project.gui-scripts]
+msfs-checklist = "checklist_app.app:main"
+msfs-controls = "controls_app.app:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+checklist_app = ["data/*.json"]
+controls_app = ["data/plans/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
