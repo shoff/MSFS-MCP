@@ -2,7 +2,7 @@
 REM ============================================================================
 REM  MSFS 2024 Companion - Electronic Checklist
 REM  Double-click this file to launch the checklist app.
-REM  First run creates a local Python virtual environment and installs deps;
+REM  On first run it creates a local .venv and installs the requirements;
 REM  later runs just start the app.
 REM ============================================================================
 setlocal
@@ -18,9 +18,9 @@ REM Provide your OpenAI key. If it's already set in your Windows environment
 REM this keeps it; otherwise it asks once (not stored to disk).
 if "%OPENAI_API_KEY%"=="" set /p "OPENAI_API_KEY=Enter your OpenAI API key (or press Enter to skip): "
 
-REM ------------------------------------------------------------ Python + deps
+REM ------------------------------------------------------- 1) ensure a .venv
 if not exist ".venv\Scripts\python.exe" (
-    echo Creating virtual environment ^(first run only^)...
+    echo No virtual environment found - creating .venv ...
     py -3 -m venv .venv 2>nul || python -m venv .venv
     if not exist ".venv\Scripts\python.exe" (
         echo.
@@ -29,12 +29,25 @@ if not exist ".venv\Scripts\python.exe" (
         pause
         exit /b 1
     )
-    call ".venv\Scripts\activate.bat"
+)
+
+call ".venv\Scripts\activate.bat"
+
+REM -------------------------------------------- 2) ensure requirements installed
+REM The marker file is written only after a successful install, so a half-finished
+REM or failed first install is retried on the next run instead of being skipped.
+if not exist ".venv\.deps-installed" (
+    echo Installing the checklist app and its requirements ^(first run only^)...
     python -m pip install --upgrade pip
-    echo Installing the checklist app and its dependencies...
     pip install -e ".[checklist,openai]"
-) else (
-    call ".venv\Scripts\activate.bat"
+    if errorlevel 1 (
+        echo.
+        echo ERROR: installing requirements failed. Check your internet connection
+        echo and re-run this file to try again.
+        pause
+        exit /b 1
+    )
+    echo installed > ".venv\.deps-installed"
 )
 
 REM -------------------------------------------------------------------- Launch
