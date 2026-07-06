@@ -31,6 +31,8 @@ from PyQt6.QtWidgets import (
 
 from . import theme
 from .models import Aircraft, ChecklistItem, ChecklistSection, load_aircraft
+from .sim_link import STATE_CONNECTING, STATE_LIVE, STATE_OFFLINE, SimLink
+from .verify import parse_verify, satisfied, vars_needed
 
 GROUP_LABELS = {"Normal": "NORMAL PROCEDURES", "Emergency": "EMERGENCY", "Abnormal": "ABNORMAL"}
 VSPEEDS_KEY = -1  # sidebar sentinel for the V-speeds reference page
@@ -48,6 +50,11 @@ class ItemRow(QWidget):
         self.reference = reference  # non-checkable info row (V-speeds)
         self._current = False
         self._hover = False
+        self.sim_live = False  # painted hint: sim can auto-verify this item
+        try:
+            self.conditions = parse_verify(item.verify) if item.verify else []
+        except ValueError:
+            self.conditions = []  # tolerate bad verify data (e.g. hand-edited JSON)
         self.setFixedHeight(38)
         self.setMouseTracking(True)
         if not reference:
@@ -107,11 +114,19 @@ class ItemRow(QWidget):
                 p.setPen(pen)
                 p.drawLine(cx - 4, cy, cx - 1, cy + 3)
                 p.drawLine(cx - 1, cy + 3, cx + 4, cy - 3)
+                if self.item.sim_checked:  # amber corner dot = confirmed by the sim
+                    p.setPen(Qt.PenStyle.NoPen)
+                    p.setBrush(QColor(theme.AMBER))
+                    p.drawEllipse(cx + 4, cy - 9, 6, 6)
             else:
                 ring = theme.RED_DIM if self.emergency else theme.TEXT_FAINT
                 p.setPen(QPen(QColor(ring), 1.6))
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawEllipse(cx - 7, cy - 7, 14, 14)
+                if self.conditions:  # sim-verifiable: inner dot, amber when live
+                    p.setPen(Qt.PenStyle.NoPen)
+                    p.setBrush(QColor(theme.AMBER if self.sim_live else theme.TEXT_FAINT))
+                    p.drawEllipse(cx - 2, cy - 2, 5, 5)
             x = cx + 20
 
         # fonts
@@ -229,6 +244,13 @@ class MainWindow(QMainWindow):
         self._load_aircraft(self.aircraft)
         self.pin_btn.setChecked(True)
 
+        # live sim verification
+        self.sim_state = STATE_OFFLINE
+        self.sim = SimLink(self)
+        self.sim.state_changed.connect(self._on_sim_state)
+        self.sim.values_read.connect(self._on_sim_values)
+        self.sim.start()
+
     # ------------------------------------------------------------- header
     def _build_header(self) -> QWidget:
         header = QWidget(objectName="Header")
@@ -249,6 +271,16 @@ class MainWindow(QMainWindow):
             self.aircraft_combo.addItem(ac.name)
         self.aircraft_combo.currentIndexChanged.connect(self._on_aircraft_change)
         lay.addWidget(self.aircraft_combo)
+
+        self.sim_chip = QToolButton()
+        self.sim_chip.setText("○ SIM")
+        self.sim_chip.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.sim_chip.setToolTip(
+            "Live sim verification: items with a dot check themselves when you\n"
+            "actually do them in the cockpit. Click to retry the connection."
+        )
+        self.sim_chip.clicked.connect(lambda: self.sim.request_reconnect())
+        lay.addWidget(self.sim_chip)
 
         self.pin_btn = QToolButton()
         self.pin_btn.setText("⏏ On top")
@@ -381,9 +413,10 @@ class MainWindow(QMainWindow):
 
     def _clear_canvas(self) -> None:
         while self.canvas_lay.count() > 1:
-            child = self.canvas_lay.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+            widget = self.canvas_lay.takeAt(0).widget()
+            if widget is not None:
+                widget.setParent(None)  # detach visually right away
+                widget.deleteLater()
         self.rows = []
         self.check_rows = []
 
@@ -394,9 +427,11 @@ class MainWindow(QMainWindow):
         self.section_title.setProperty("emergency", "true" if section.is_emergency else "false")
         self.section_title.style().unpolish(self.section_title)
         self.section_title.style().polish(self.section_title)
+        verifiable = sum(1 for i in section.items if i.verifiable)
         self.section_meta.setText(
             f"{self.aircraft.short_name} · {GROUP_LABELS.get(section.group, section.group)}"
             + (" · ▪ = memory item" if any(i.memory for i in section.items) else "")
+            + (f" · • {verifiable} sim-verified" if verifiable else "")
         )
         self.progress.setProperty("emergency", "true" if section.is_emergency else "false")
         self.progress.style().unpolish(self.progress)
@@ -409,6 +444,7 @@ class MainWindow(QMainWindow):
                 self.canvas_lay.insertWidget(insert_at, NoteRow(item.challenge))
             else:
                 row = ItemRow(item, emergency=section.is_emergency)
+                row.sim_live = getattr(self, "sim_state", "") == STATE_LIVE
                 row.toggled.connect(self._on_row_clicked)
                 self.canvas_lay.insertWidget(insert_at, row)
                 self.rows.append(row)
@@ -419,6 +455,7 @@ class MainWindow(QMainWindow):
         self._apply_current()
         self._refresh_progress()
         self.scroll.verticalScrollBar().setValue(0)
+        self._update_sim_watch()
 
     def _show_vspeeds(self) -> None:
         self.section = None
@@ -454,6 +491,8 @@ class MainWindow(QMainWindow):
 
     def _on_row_clicked(self, row: ItemRow) -> None:
         row.item.checked = not row.item.checked
+        if not row.item.checked:
+            row.item.sim_checked = False
         row.update()
         if row.item.checked:
             self.cur = self._first_unchecked()
@@ -467,6 +506,8 @@ class MainWindow(QMainWindow):
             return
         row = self.check_rows[self.cur]
         row.item.checked = not row.item.checked
+        if not row.item.checked:
+            row.item.sim_checked = False
         row.update()
         if row.item.checked:
             nxt = self._first_unchecked()
@@ -522,11 +563,61 @@ class MainWindow(QMainWindow):
                 self.sidebar.setCurrentRow(i)
                 return
 
+    # ------------------------------------------------------- sim verification
+    def _update_sim_watch(self) -> None:
+        """Watch every verify var in the active section."""
+        watch: set[str] = set()
+        for row in self.check_rows:
+            watch |= vars_needed(row.conditions)
+        if hasattr(self, "sim"):
+            self.sim.set_watch(watch)
+
+    def _on_sim_state(self, state: str) -> None:
+        self.sim_state = state
+        live = state == STATE_LIVE
+        label = {STATE_LIVE: "● SIM LIVE", STATE_CONNECTING: "◌ SIM…", STATE_OFFLINE: "○ SIM"}[state]
+        color = {STATE_LIVE: theme.GREEN, STATE_CONNECTING: theme.AMBER, STATE_OFFLINE: theme.TEXT_FAINT}[state]
+        self.sim_chip.setText(label)
+        self.sim_chip.setStyleSheet(f"QToolButton {{ color: {color}; }}")
+        for row in self.check_rows:
+            row.sim_live = live
+            row.update()
+
+    def _on_sim_values(self, values: dict) -> None:
+        """Auto-check the CURRENT item when the sim shows it done (strict flow order).
+
+        Cascades: if checking the current item makes the next one current and
+        the same snapshot already satisfies it, it checks too.
+        """
+        if self.sim_state != STATE_LIVE or not self.check_rows:
+            return
+        advanced = False
+        for _ in range(len(self.check_rows)):
+            if self.cur >= len(self.check_rows):
+                break
+            row = self.check_rows[self.cur]
+            if row.item.checked or not row.conditions or not satisfied(row.conditions, values):
+                break
+            row.item.checked = True
+            row.item.sim_checked = True
+            row.update()
+            self.cur = self._first_unchecked()
+            advanced = True
+        if advanced:
+            self._apply_current()
+            self._refresh_progress()
+
     # ------------------------------------------------------------- window
     def _on_pin_toggle(self, on: bool) -> None:
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on)
         if self.isVisible():
             self.show()  # re-show required after changing window flags
+
+    def closeEvent(self, event):  # noqa: N802
+        if hasattr(self, "sim"):
+            self.sim.stop()
+            self.sim.wait(2000)
+        super().closeEvent(event)
 
     def keyPressEvent(self, event):  # noqa: N802
         key = event.key()
