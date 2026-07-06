@@ -2,20 +2,23 @@
 
 from pathlib import Path
 
-from controls_app.binding_check import build_tests, spec_for
+from controls_app.binding_check import build_tests
 from controls_app.bindings import load_default_plans
 from controls_app.devices import HONEYCOMB_ALPHA, HONEYCOMB_BRAVO, VELOCITYONE_RUDDER
 from controls_app.input_map import InputMap, load_maps
+from controls_app.settings_registry import spec_for_setting
 
 
 def test_spec_for_matching():
-    assert spec_for("THROTTLE AXIS").var == "GENERAL_ENG_THROTTLE_LEVER_POSITION:1"
-    assert spec_for("TOGGLE MASTER BATTERY").var == "ELECTRICAL_MASTER_BATTERY"
-    assert spec_for("TOGGLE CARBURETOR HEAT (ANTI-ICE)").var == "GENERAL_ENG_ANTI_ICE_POSITION:1"
-    assert spec_for("MAGNETO OFF / RIGHT / LEFT / BOTH / START (PER POSITION)") is not None
-    assert spec_for("—") is None
-    assert spec_for("") is None
-    assert spec_for("(default 'Cockpit interaction' bindings)") is None
+    assert spec_for_setting("THROTTLE AXIS").check_var == "GENERAL_ENG_THROTTLE_LEVER_POSITION:1"
+    assert spec_for_setting("TOGGLE MASTER BATTERY").check_var == "ELECTRICAL_MASTER_BATTERY"
+    # writer and verifier now share one table: the carb-heat wording drift is gone
+    assert spec_for_setting("TOGGLE CARBURETOR HEAT (ANTI-ICE)").check_var == "GENERAL_ENG_ANTI_ICE_POSITION:1"
+    assert spec_for_setting("TOGGLE CARBURETOR HEAT").check_var == "GENERAL_ENG_ANTI_ICE_POSITION:1"
+    assert spec_for_setting("MAGNETO OFF / RIGHT / LEFT / BOTH / START (PER POSITION)") is not None
+    assert spec_for_setting("—") is None
+    assert spec_for_setting("") is None
+    assert spec_for_setting("(default 'Cockpit interaction' bindings)") is None
 
 
 def _tests_for(device, device_id, aircraft="c172s"):

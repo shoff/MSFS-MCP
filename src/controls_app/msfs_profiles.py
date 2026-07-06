@@ -211,51 +211,8 @@ def write_bindings(
 
 
 # --------------------------------------------------------------------------
-# Plan -> writable actions
+# Plan -> writable actions  (driven entirely by settings_registry)
 # --------------------------------------------------------------------------
-
-# msfs_setting (normalized) -> action name(s). Multi-direction controls expand
-# to several actions bound to consecutive learned button indices.
-AXIS_ACTIONS = {
-    "AILERONS AXIS": "KEY_AXIS_AILERONS_SET",
-    "ELEVATOR AXIS": "KEY_AXIS_ELEVATOR_SET",
-    "RUDDER AXIS": "KEY_AXIS_RUDDER_SET",
-    "THROTTLE AXIS": "KEY_AXIS_THROTTLE_SET",
-    "MIXTURE AXIS": "KEY_AXIS_MIXTURE_SET",
-    "LEFT BRAKE AXIS": "KEY_AXIS_LEFT_BRAKE_SET",
-    "RIGHT BRAKE AXIS": "KEY_AXIS_RIGHT_BRAKE_SET",
-}
-
-BUTTON_ACTIONS = {
-    "TOGGLE MASTER BATTERY": ["KEY_TOGGLE_MASTER_BATTERY"],
-    "TOGGLE MASTER ALTERNATOR": ["KEY_TOGGLE_MASTER_ALTERNATOR"],
-    "TOGGLE AVIONICS MASTER 1": ["KEY_TOGGLE_AVIONICS_MASTER"],
-    "TOGGLE BEACON LIGHTS": ["KEY_TOGGLE_BEACON_LIGHTS"],
-    "LANDING LIGHTS TOGGLE": ["KEY_LANDING_LIGHTS_TOGGLE"],
-    "TOGGLE TAXI LIGHTS": ["KEY_TOGGLE_TAXI_LIGHTS"],
-    "TOGGLE NAV LIGHTS": ["KEY_TOGGLE_NAV_LIGHTS"],
-    "TOGGLE STROBES": ["KEY_STROBES_TOGGLE"],
-    "TOGGLE ELECTRIC FUEL PUMP": ["KEY_TOGGLE_ELECT_FUEL_PUMP"],
-    "TOGGLE PITOT HEAT": ["KEY_PITOT_HEAT_TOGGLE"],
-    "TOGGLE CARBURETOR HEAT (ANTI-ICE)": ["KEY_ANTI_ICE_TOGGLE_ENG1"],
-    "AUTOPILOT OFF / DISCONNECT": ["KEY_AUTOPILOT_OFF"],
-    "TOGGLE AUTOPILOT MASTER": ["KEY_AP_MASTER"],
-    "TOGGLE AUTOPILOT HEADING HOLD": ["KEY_AP_HDG_HOLD"],
-    "TOGGLE AUTOPILOT NAV1 HOLD": ["KEY_AP_NAV1_HOLD"],
-    "TOGGLE AUTOPILOT APPROACH HOLD": ["KEY_AP_APR_HOLD"],
-    "TOGGLE AUTOPILOT REVERSE HOLD": ["KEY_AP_BC_HOLD"],
-    "TOGGLE AUTOPILOT ALTITUDE HOLD": ["KEY_AP_ALT_HOLD"],
-    "TOGGLE AUTOPILOT VS HOLD": ["KEY_AP_VS_HOLD"],
-    "AUTO THROTTLE GO AROUND / TOGA": ["KEY_AUTO_THROTTLE_TO_GA"],
-    # Multi-direction controls: bound in order to the control's learned buttons
-    "ELEVATOR TRIM UP / DOWN": ["KEY_ELEV_TRIM_UP", "KEY_ELEV_TRIM_DN"],
-    "ELEVATOR TRIM AXIS (OR TRIM UP/DOWN)": ["KEY_ELEV_TRIM_UP", "KEY_ELEV_TRIM_DN"],
-    "INCREASE / DECREASE FLAPS": ["KEY_FLAPS_INCR", "KEY_FLAPS_DECR"],
-    "MAGNETO OFF / RIGHT / LEFT / BOTH / START (PER POSITION)": [
-        "KEY_MAGNETO_OFF", "KEY_MAGNETO_RIGHT", "KEY_MAGNETO_LEFT",
-        "KEY_MAGNETO_BOTH", "KEY_MAGNETO_START",
-    ],
-}
 
 
 @dataclass
@@ -271,50 +228,39 @@ def resolve_writes(plan_bindings, control_ids: dict[str, str], input_map) -> Res
     control_ids:   {control label -> control id} from the DeviceProfile
     input_map:     InputMap with the learned/default physical indices
     """
-    from .input_map import AXIS_KEYCODES
-
-    def lookup(label: str) -> str | None:
-        if label in control_ids:
-            return control_ids[label]
-        # tolerate abbreviated labels ("Flap lever" vs "Flap lever (increment up/down)")
-        lowered = label.lower()
-        for full_label, cid in control_ids.items():
-            fl = full_label.lower()
-            if fl.startswith(lowered) or lowered.startswith(fl):
-                return cid
-        return None
+    from .input_map import AXIS_KEYCODES, lookup_control
+    from .settings_registry import spec_for_setting
 
     out = ResolvedWrites()
     for b in plan_bindings:
-        setting = b.msfs_setting.strip().upper()
-        control_id = lookup(b.control)
-        if "UNBOUND" in b.assignment.upper() or setting in ("", "—", "-"):
+        if "UNBOUND" in b.assignment.upper():
             continue
+        spec = spec_for_setting(b.msfs_setting)
+        if spec is None:
+            if b.msfs_setting.strip() not in ("", "—", "-"):
+                out.skipped.append((b.control, "no auto-writable MSFS action — set in the MSFS UI"))
+            continue
+        control_id = lookup_control(b.control, control_ids)
         if control_id is None:
             out.skipped.append((b.control, "control not in device profile"))
             continue
 
-        if setting in AXIS_ACTIONS:
+        if spec.kind == "axis":
             axis = input_map.axis_for_control(control_id)
             if axis is None or axis >= len(AXIS_KEYCODES):
                 out.skipped.append((b.control, "no axis learned — use Learn mode first"))
                 continue
-            out.actions.append(ActionWrite(AXIS_ACTIONS[setting], AXIS_KEYCODES[axis], b.control))
+            out.actions.append(ActionWrite(spec.actions[0], AXIS_KEYCODES[axis], b.control))
             continue
 
-        matched = next((acts for key, acts in BUTTON_ACTIONS.items() if key in setting), None)
-        if matched:
-            buttons = input_map.buttons_for_control(control_id)
-            if len(buttons) < len(matched):
-                out.skipped.append(
-                    (b.control, f"needs {len(matched)} learned button(s), have {len(buttons)}")
-                )
-                continue
-            for action_name, btn in zip(matched, buttons):
-                out.actions.append(
-                    ActionWrite(action_name, f"JOYSTICK_BUTTON_{btn + 1}", b.control)
-                )
+        # button spec: bind each action to the control's learned buttons IN ORDER
+        buttons = input_map.buttons_for_control(control_id)
+        if len(buttons) < len(spec.actions):
+            out.skipped.append(
+                (b.control, f"needs {len(spec.actions)} learned button(s), have {len(buttons)}"
+                            " — use Learn mode")
+            )
             continue
-
-        out.skipped.append((b.control, "no auto-writable MSFS action — set in the MSFS UI"))
+        for action_name, btn in zip(spec.actions, buttons):
+            out.actions.append(ActionWrite(action_name, f"JOYSTICK_BUTTON_{btn + 1}", b.control))
     return out

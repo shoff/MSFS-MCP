@@ -563,14 +563,57 @@ class MainWindow(QMainWindow):
     def _view_and_map(self, device_id: str) -> tuple[DeviceView, InputMap]:
         return self.views[device_id], self.maps[device_id]
 
+    # -- Learn-mode capture (multi-slot, ordered) --------------------------
+    def _control_kind(self, device_id: str, control_id: str) -> str:
+        for c in DEVICE_BY_ID[device_id].inputs:
+            if c.id == control_id:
+                return c.kind
+        return "button"
+
+    def _spec_for_control(self, device_id: str, control_id: str):
+        """The canonical SettingSpec this control is bound to in the active plan."""
+        from .input_map import lookup_control
+        from .settings_registry import spec_for_setting
+
+        for b in self.plan.devices.get(device_id, []):
+            if lookup_control(b.control, {c.label: c.id for c in DEVICE_BY_ID[device_id].inputs}) == control_id:
+                return spec_for_setting(b.msfs_setting)
+        return None
+
+    def _begin_capture(self, device_id: str, control_id: str) -> None:
+        kind = self._control_kind(device_id, control_id)
+        spec = self._spec_for_control(device_id, control_id)
+        if kind in ("axis", "lever"):
+            self._learn = {"control": control_id, "is_axis": True, "labels": ["move it fully"], "buffer": []}
+            prompt = "move the physical axis fully"
+        else:
+            labels = list(spec.slots) if (spec and spec.kind == "button" and len(spec.slots) > 1) else ["press it"]
+            self._learn = {"control": control_id, "is_axis": False, "labels": labels, "buffer": []}
+            prompt = labels[0]
+        self.status.setText(f"Learn '{control_id}': {prompt}…")
+
+    def _learn_active(self, control_id: str) -> bool:
+        return getattr(self, "_learn", None) is not None and self._learn["control"] == control_id
+
     def _on_button(self, device_id: str, index: int, pressed: bool) -> None:
         view, imap = self._view_and_map(device_id)
         self.raw_input.setText(f"{device_id}: button {index} {'▼' if pressed else '▲'}")
-        if pressed and view.learn_mode and view.selected:
-            imap.learn_button(index, view.selected)
-            save_maps(self.maps)
-            self.status.setText(f"Learned: button {index} → {view.selected} (saved)")
-            view.pulse(view.selected)
+        learn = getattr(self, "_learn", None)
+        if pressed and view.learn_mode and learn and not learn["is_axis"]:
+            if index in learn["buffer"]:
+                return  # ignore a repeat of an already-captured slot
+            learn["buffer"].append(index)
+            view.pulse(learn["control"])
+            if len(learn["buffer"]) >= len(learn["labels"]):
+                imap.set_control_buttons(learn["control"], learn["buffer"])
+                save_maps(self.maps)
+                self.status.setText(
+                    f"Learned {learn['control']} → buttons {learn['buffer']} (saved)"
+                )
+                self._learn = None
+            else:
+                nxt = learn["labels"][len(learn["buffer"])]
+                self.status.setText(f"Learn '{learn['control']}': now {nxt}…")
             return
         control = imap.control_for_button(index)
         if control:
@@ -579,10 +622,12 @@ class MainWindow(QMainWindow):
     def _on_axis(self, device_id: str, index: int, value: float) -> None:
         view, imap = self._view_and_map(device_id)
         self.raw_input.setText(f"{device_id}: axis {index} = {value:+.2f}")
-        if view.learn_mode and view.selected and abs(value) > 0.75:
-            imap.learn_axis(index, view.selected)
+        learn = getattr(self, "_learn", None)
+        if view.learn_mode and learn and learn["is_axis"] and abs(value) > 0.75:
+            imap.learn_axis(index, learn["control"])
             save_maps(self.maps)
-            self.status.setText(f"Learned: axis {index} → {view.selected} (saved)")
+            self.status.setText(f"Learned {learn['control']} → axis {index} (saved)")
+            self._learn = None
         control = imap.control_for_axis(index)
         if control:
             view.set_value(control, value)
@@ -599,17 +644,17 @@ class MainWindow(QMainWindow):
         view = self.view_stack.currentWidget()
         if isinstance(view, DeviceView) and view.learn_mode:
             view.set_selected(control_id)
-            self.status.setText(
-                f"Learn: now press / move the physical '{control_id}' on the {view.device_id}…"
-            )
+            self._begin_capture(view.device_id, control_id)
 
     def _on_learn_toggle(self, on: bool) -> None:
+        self._learn = None
         for view in self.views.values():
             view.learn_mode = on
             if not on:
                 view.set_selected(None)
         self.status.setText(
-            "Learn mode: click a control on the diagram, then press the real input." if on else ""
+            "Learn mode: click a control on the diagram, then press the real input(s) it prompts for."
+            if on else ""
         )
 
     def eventFilter(self, obj, event):  # noqa: N802 — keyboard/mouse visualizer
