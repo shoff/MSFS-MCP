@@ -20,8 +20,8 @@ class DeviceProfile:
     id: str
     name: str
     manufacturer: str
-    # USB vendor/product IDs used for exact detection, plus name substrings
-    # as a fallback (pygame reports the OS device name).
+    # USB vendor/product IDs for exact detection (parsed from the SDL joystick
+    # GUID), with name substrings as a fallback when the GUID carries no IDs.
     usb_ids: list[tuple[int, int]] = field(default_factory=list)
     match_names: list[str] = field(default_factory=list)
     inputs: list[ControlInput] = field(default_factory=list)
@@ -130,9 +130,31 @@ DEVICES: list[DeviceProfile] = [
 DEVICE_BY_ID = {d.id: d for d in DEVICES}
 
 
+def vid_pid_from_guid(guid: str | None) -> tuple[int | None, int | None]:
+    """Extract (vendor, product) from an SDL joystick GUID.
+
+    SDL packs the USB vendor at bytes 4-5 and product at bytes 8-9, each
+    little-endian, in the 32-hex-char GUID. Parsing it lets us match hardware
+    by its real USB IDs even when the OS reports a generic joystick name
+    (drivers and platforms rename devices; the IDs don't move). Returns
+    (None, None) for a GUID that carries no USB IDs (e.g. bus type 0).
+    """
+    if not guid or len(guid) < 20:
+        return None, None
+    try:
+        vendor = int.from_bytes(bytes.fromhex(guid[8:12]), "little")
+        product = int.from_bytes(bytes.fromhex(guid[16:20]), "little")
+    except ValueError:
+        return None, None
+    if vendor == 0:
+        return None, None
+    return vendor, product
+
+
 def detect_connected() -> dict[str, bool]:
     """Return {device_id: detected} using pygame's joystick list if available.
 
+    Matches by USB VID/PID (from the SDL GUID) first, then by name substring.
     Keyboard/mouse is always True. Runs headless-safe: any pygame problem
     (not installed, no SDL) degrades to "nothing detected".
     """
@@ -145,15 +167,17 @@ def detect_connected() -> dict[str, bool]:
 
         pygame.init()
         pygame.joystick.init()
-        names = []
+        sticks = []  # (name, vid, pid)
         for i in range(pygame.joystick.get_count()):
             stick = pygame.joystick.Joystick(i)
-            names.append(stick.get_name())
+            guid = stick.get_guid() if hasattr(stick, "get_guid") else None
+            vid, pid = vid_pid_from_guid(guid)
+            sticks.append((stick.get_name(), vid, pid))
         pygame.joystick.quit()
         for device in DEVICES:
             if device.always_present:
                 continue
-            detected[device.id] = any(device.matches(n) for n in names)
+            detected[device.id] = any(device.matches(n, vid, pid) for n, vid, pid in sticks)
     except Exception:
         pass
     return detected

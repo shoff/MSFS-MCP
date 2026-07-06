@@ -24,6 +24,22 @@ def test_device_matching():
     assert not HONEYCOMB_ALPHA.matches("Some Random Gamepad")
 
 
+def test_vid_pid_parsed_from_sdl_guid():
+    from controls_app.devices import vid_pid_from_guid
+
+    # SDL GUID: vendor 0x294B at bytes 4-5, product 0x1900 at bytes 8-9 (LE).
+    guid = "03000000" "4b290000" "00190000" "00000000"
+    assert vid_pid_from_guid(guid) == (0x294B, 0x1900)
+    # A real Honeycomb Alpha reports exactly these — matching by GUID even when
+    # the OS renames the device.
+    vid, pid = vid_pid_from_guid(guid)
+    assert HONEYCOMB_ALPHA.matches("Generic USB Joystick", vid=vid, pid=pid)
+    # No USB IDs in the GUID (bus type only) -> (None, None), not a crash.
+    assert vid_pid_from_guid("00000000000000000000000000000000") == (None, None)
+    assert vid_pid_from_guid(None) == (None, None)
+    assert vid_pid_from_guid("short") == (None, None)
+
+
 def test_plans_exist_for_both_aircraft(plans):
     assert "c172s" in plans
     assert "pa28_181" in plans

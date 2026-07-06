@@ -6,7 +6,7 @@ import os
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from .devices import DEVICES
+from .devices import DEVICES, vid_pid_from_guid
 
 POLL_MS = 33  # ~30 Hz
 AXIS_EPSILON = 0.01
@@ -72,10 +72,12 @@ class InputMonitor(QObject):
             stick = pygame.joystick.Joystick(i)
             stick.init()
             name = stick.get_name()
+            guid = stick.get_guid() if hasattr(stick, "get_guid") else None
+            vid, pid = vid_pid_from_guid(guid)
             for device in DEVICES:
                 if device.always_present or device.id in self._sticks:
                     continue
-                if device.matches(name):
+                if device.matches(name, vid, pid):
                     self._sticks[device.id] = stick
                     self._state[device.id] = {
                         "buttons": [False] * stick.get_numbuttons(),
