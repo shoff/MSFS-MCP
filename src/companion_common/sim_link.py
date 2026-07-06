@@ -52,6 +52,12 @@ class SimLink(QThread):
     def set_watch(self, names: set[str]) -> None:
         with self._watch_lock:
             self._watch = set(names)
+        # Wake the poll loop so the new watch set is sampled on the next
+        # iteration instead of up to POLL_S later. This matters for live
+        # verification: it captures the baseline for the new SimVar promptly,
+        # before the user can operate a momentary control and slip the change
+        # past a not-yet-established baseline.
+        self._kick.set()
 
     def set_base_watch(self, names: set[str]) -> None:
         with self._watch_lock:

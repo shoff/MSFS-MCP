@@ -176,7 +176,10 @@ class VerifyDialog(QDialog):
             # Only grade hardware-only once we KNOW the sim is unreachable — not
             # during the initial connecting window, or we'd pass an unchecked binding.
             self._finish_current("hw_only")
-        elif t.hw_seen and not self.fail_timer.isActive():
+        elif t.hw_seen and self.baseline is not None and not self.fail_timer.isActive():
+            # Only start the sim's fail clock once we have a baseline to compare
+            # against — otherwise a fast operator who moves before the first
+            # sample lands would be graded before the sim ever had a reference.
             self.fail_timer.start(SIM_FAIL_TIMEOUT_MS)  # sim has this long to react
 
     def _on_sim_timeout(self) -> None:
@@ -253,6 +256,9 @@ class VerifyDialog(QDialog):
             return
         if self.baseline is None:
             self.baseline = v
+            # Hardware may already have been operated; now that a baseline
+            # exists, let _maybe_pass start the sim fail clock.
+            self._maybe_pass()
             return
         if abs(v - self.baseline) >= t.spec.threshold:
             t.sim_seen = True
