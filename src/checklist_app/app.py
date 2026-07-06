@@ -96,7 +96,7 @@ class ItemRow(QWidget):
             p.drawRoundedRect(r.left(), r.top() + 6, 3, r.height() - 12, 1, 1)
         elif self._hover and not self.reference:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor("#141b25"))
+            p.setBrush(QColor(theme.ROW_HOVER_SOFT))
             p.drawRoundedRect(r, 8, 8)
 
         cy = r.center().y() + 1
@@ -109,7 +109,7 @@ class ItemRow(QWidget):
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(QColor(theme.GREEN))
                 p.drawEllipse(cx - 8, cy - 8, 16, 16)
-                pen = QPen(QColor("#0b1016"), 2)
+                pen = QPen(QColor(theme.INK_ON_BRIGHT), 2)
                 pen.setCapStyle(Qt.PenCapStyle.RoundCap)
                 p.setPen(pen)
                 p.drawLine(cx - 4, cy, cx - 1, cy + 3)
@@ -148,11 +148,11 @@ class ItemRow(QWidget):
             if self.reference:
                 r_color = theme.AMBER
             elif self.emergency:
-                r_color = "#ff8a8a"
+                r_color = theme.EMERGENCY_TEXT
             else:
                 r_color = theme.ACCENT
             if self.item.memory and not self.item.checked:
-                c_color = "#ffd9d9" if self.emergency else theme.TEXT
+                c_color = theme.EMERGENCY_TEXT_SOFT if self.emergency else theme.TEXT
 
         right = r.right() - 14
         resp = self.item.response
@@ -403,7 +403,7 @@ class MainWindow(QMainWindow):
             entry = QListWidgetItem(sec.name)
             entry.setData(Qt.ItemDataRole.UserRole, i)
             if sec.is_emergency:
-                entry.setForeground(QColor("#e07070"))
+                entry.setForeground(QColor(theme.EMERGENCY_ENTRY))
             self.sidebar.addItem(entry)
             if first_item is None:
                 first_item = entry

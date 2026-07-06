@@ -16,6 +16,13 @@ RED = "#ff5c5c"
 RED_DIM = "#8a2f2f"
 AMBER = "#ffb454"
 
+# Derived / role colors (kept here so nothing hardcodes hex outside this file)
+INK_ON_BRIGHT = "#0b1016"   # text/marks drawn on a bright fill (accent/green)
+ROW_HOVER_SOFT = "#141b25"  # subtle hover fill, dimmer than ROW_HOVER
+EMERGENCY_TEXT = "#ff8a8a"       # emergency response text (lighter than RED)
+EMERGENCY_TEXT_SOFT = "#ffd9d9"  # emergency memory-item challenge (pale)
+EMERGENCY_ENTRY = "#e07070"      # emergency section in the sidebar
+
 QSS = f"""
 * {{
     font-family: "Segoe UI", "Inter", "Cantarell", "Noto Sans", sans-serif;

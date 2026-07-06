@@ -103,7 +103,7 @@ QPushButton#AskButton, QPushButton#WriteButton {{
     border-color: {theme.ACCENT_DIM};
     font-weight: 600;
 }}
-QPushButton#AskButton:hover, QPushButton#WriteButton:hover {{ background: {theme.ACCENT}; color: #0b1016; }}
+QPushButton#AskButton:hover, QPushButton#WriteButton:hover {{ background: {theme.ACCENT}; color: {theme.INK_ON_BRIGHT}; }}
 QPushButton#AskButton:disabled {{ background: {theme.PANEL_ALT}; color: {theme.TEXT_FAINT}; }}
 QLabel#RawInput {{
     color: {theme.AMBER};
