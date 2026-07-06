@@ -21,14 +21,15 @@ git clone <your-repo-url> msfs2024-mcp
 cd msfs2024-mcp
 python -m venv .venv
 .venv\Scripts\activate
-pip install -e .
+pip install -e .                 # server core (SimConnect layer)
+pip install -e ".[transports]"   # optional: adds the FSUIPC7 + raw-memory layers
 copy .env.example .env   # then edit if you like
 ```
 
 Layer prerequisites:
 - **SimConnect** — installed automatically with the `SimConnect` pip package, which ships its own `SimConnect.dll`. Just have MSFS running and loaded into a flight.
-- **FSUIPC7** — download and run [FSUIPC7](http://www.fsuipc.com/) (free for basic offset access). Leave it running alongside MSFS.
-- **Raw memory** — set `MSFS_ENABLE_MEMORY=true` in `.env` and run the server **as Administrator**. Off by default.
+- **FSUIPC7** — install the `transports` extra (above), then download and run [FSUIPC7](http://www.fsuipc.com/) (free for basic offset access). Leave it running alongside MSFS. Both `fsuipc` and `pymem` are optional and degrade gracefully when absent, so the core server and the GUI apps run without them.
+- **Raw memory** — install the `transports` extra, set `MSFS_ENABLE_MEMORY=true` in `.env`, and run the server **as Administrator**. Off by default.
 
 ## Verify it works
 
