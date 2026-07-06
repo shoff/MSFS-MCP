@@ -38,7 +38,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from checklist_app import theme
+from companion_common import theme
 
 from . import advisor, msfs_profiles
 from .bindings import ControlPlan, load_default_plans
@@ -343,7 +343,7 @@ class MainWindow(QMainWindow):
         QApplication.instance().installEventFilter(self)
 
         # make sure the shared MCP server is up (detached; survives app close)
-        from checklist_app.sim_link import McpAutostartWorker
+        from companion_common.sim_link import McpAutostartWorker
 
         self.mcp_worker = McpAutostartWorker(self)
         self.mcp_worker.result.connect(self._on_mcp_autostart)

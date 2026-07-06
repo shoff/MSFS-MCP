@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from . import theme
+from companion_common import theme
 from .debrief import DebriefUnavailable, debrief_to_markdown, generate_debrief
 from .flight_log import FlightRecorder
 

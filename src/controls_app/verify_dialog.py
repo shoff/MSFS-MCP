@@ -23,8 +23,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QColor
 
-from checklist_app import theme
-from checklist_app.sim_link import STATE_LIVE, STATE_OFFLINE, SimLink
+from companion_common import theme
+from companion_common.sim_link import STATE_LIVE, STATE_OFFLINE, SimLink
 
 from .binding_check import BindingTest, build_tests
 from .devices import DEVICE_BY_ID

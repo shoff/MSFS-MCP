@@ -29,9 +29,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from . import theme
+from companion_common import theme
 from .models import Aircraft, ChecklistItem, ChecklistSection, load_aircraft
-from .sim_link import McpAutostartWorker, STATE_CONNECTING, STATE_LIVE, STATE_OFFLINE, SimLink
+from companion_common.sim_link import McpAutostartWorker, STATE_CONNECTING, STATE_LIVE, STATE_OFFLINE, SimLink
 from .verify import parse_verify, satisfied, vars_needed
 
 GROUP_LABELS = {"Normal": "NORMAL PROCEDURES", "Emergency": "EMERGENCY", "Abnormal": "ABNORMAL"}

@@ -168,7 +168,7 @@ def test_debrief_markdown_rendering():
 
 
 def test_build_tiles_status_colors():
-    from checklist_app import theme
+    from companion_common import theme
     from checklist_app.debrief_dialog import build_tiles
 
     rec = c172_recorder()

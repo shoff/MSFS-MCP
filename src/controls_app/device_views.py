@@ -14,7 +14,7 @@ from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
-from checklist_app import theme
+from companion_common import theme
 
 VIRTUAL_W, VIRTUAL_H = 1000.0, 460.0
 PULSE_MS = 280

@@ -1,12 +1,16 @@
-"""Auto-start helper: make sure a shared MCP server is running locally.
+"""Auto-start helper: make sure the HTTP MCP server is running locally.
 
-Called by the companion GUI apps at launch. The server runs in HTTP
-(streamable-http) mode on a fixed local port so that:
+Called by the companion GUI apps at launch as a convenience: it brings up the
+streamable-http MCP server on a fixed local port so an external MCP client
+(e.g. Claude Code) can attach at http://127.0.0.1:8787/mcp without the user
+starting it by hand. The server runs HTTP so that:
   - "is it running?" is a simple TCP port check (no process scanning),
-  - one instance is shared by everything and outlives the app that started it,
-  - MCP clients can attach at http://127.0.0.1:8787/mcp.
+  - one instance outlives the app that started it and any MCP client can attach.
 
-No Qt imports here — GUI apps wrap this in their own worker thread.
+Note: the GUI apps do NOT talk to the sim *through* this server — they read sim
+state in-process via ``msfs_mcp.simconnect_client.SimConnectClient`` directly
+(lower latency, no round trip). The server this starts is purely for external
+MCP clients. No Qt imports here — GUI apps wrap this in their own worker thread.
 Set MSFS_COMPANION_AUTOSTART=0 to disable.
 """
 
