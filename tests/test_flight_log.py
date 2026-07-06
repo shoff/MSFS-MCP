@@ -32,6 +32,7 @@ def test_parse_limits_c172():
     limits = parse_limits(aircraft.vspeeds)
     assert limits["vne"] == 163 and limits["vno"] == 129
     assert limits["vfe"] == 85  # full-flap limit, not the 10° limit
+    assert limits["vr"] == 55
 
 
 def test_engine_takeoff_landing_detection():
@@ -109,3 +110,67 @@ def test_debrief_prompt_contains_the_log():
     prompt = build_prompt(rec.summary())
     assert "flight log" in prompt.lower()
     assert "Cessna" in prompt and "vne" in prompt
+
+
+FAKE_DEBRIEF = {
+    "overview": "A short pattern flight with a late rotation.",
+    "grades": [
+        {"area": "Checklist discipline", "score": 4, "comment": "2 of 2 items sim-verified."},
+        {"area": "Speed control", "score": 2, "comment": "Flaps out at 96 vs Vfe 85."},
+        {"area": "Configuration management", "score": 3, "comment": "Flaps late on final."},
+        {"area": "Takeoff & landing technique", "score": 3, "comment": "Rotated at 62 vs Vr 55; -480 fpm arrival."},
+    ],
+    "went_well": ["Run-up flow was complete."],
+    "work_on": [
+        {"title": "Rotate at Vr", "evidence": "62 KIAS vs Vr 55", "why": "Extends the ground roll",
+         "fix": "Call 'airspeed alive, 55 rotate' aloud."},
+    ],
+    "next_flight": "Three circuits focusing on rotation at 55.",
+}
+
+
+def test_debrief_schema_is_strict():
+    from checklist_app.debrief import DEBRIEF_SCHEMA
+
+    def walk(schema):
+        if isinstance(schema, dict):
+            if schema.get("type") == "object":
+                assert schema.get("additionalProperties") is False
+                assert "required" in schema
+            for value in schema.values():
+                walk(value)
+        elif isinstance(schema, list):
+            for value in schema:
+                walk(value)
+
+    walk(DEBRIEF_SCHEMA)
+
+
+def test_debrief_markdown_rendering():
+    from checklist_app.debrief import debrief_to_markdown
+
+    md = debrief_to_markdown(FAKE_DEBRIEF)
+    assert "★★★★☆" in md and "★★☆☆☆" in md  # star bars for scores 4 and 2
+    assert "(4/5)" in md and "(2/5)" in md
+    assert "Rotate at Vr" in md and "Next flight" in md
+
+
+def test_build_tiles_status_colors():
+    from checklist_app import theme
+    from checklist_app.debrief_dialog import build_tiles
+
+    rec = c172_recorder()
+    t = 0.0
+    rec.update(sample(1, 0, 1000), now=t)
+    t += 1; rec.update(sample(1, 55, 1000), now=t)
+    t += 1; rec.update(sample(0, 62, 1010), now=t)                # rotate at 62 (Vr 55 -> +7 amber)
+    for _ in range(3):
+        t += 1; rec.update(sample(0, 95, 1200, flaps=1), now=t)   # flaps above Vfe
+    t += 1; rec.update(sample(0, 60, 1005), now=t)
+    t += 1; rec.update(sample(0, 60, 997), now=t)                 # -480 fpm
+    t += 1; rec.update(sample(1, 54, 996), now=t)
+
+    tiles = {label: (value, caption, color) for label, value, caption, color in build_tiles(rec.summary())}
+    assert tiles["ROTATION"][2] == theme.AMBER and "(+7)" in tiles["ROTATION"][1]
+    assert tiles["TOUCHDOWN"][1] == "hard" and tiles["TOUCHDOWN"][2] == theme.RED
+    assert tiles["LIMITS"][2] == theme.RED and "flaps above Vfe" in tiles["LIMITS"][1]

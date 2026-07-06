@@ -1,4 +1,8 @@
-"""Instructor-style post-flight debrief, written by Claude from the flight log."""
+"""Instructor-style post-flight debrief, written by Claude from the flight log.
+
+Returns STRUCTURED data (report-card grades + findings) so the dialog can
+render it graphically instead of as one text blob.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,54 @@ import os
 
 MODEL = "claude-opus-4-8"
 
-SYSTEM_PROMPT = """\
+GRADE_AREAS = [
+    "Checklist discipline",
+    "Speed control",
+    "Configuration management",
+    "Takeoff & landing technique",
+]
+
+DEBRIEF_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "overview": {"type": "string", "description": "2-3 sentence summary of the flight"},
+        "grades": {
+            "type": "array",
+            "description": "Report card, one entry per area, score 1 (poor) to 5 (excellent)",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "area": {"type": "string"},
+                    "score": {"type": "integer", "enum": [1, 2, 3, 4, 5]},
+                    "comment": {"type": "string", "description": "One evidence-based sentence"},
+                },
+                "required": ["area", "score", "comment"],
+                "additionalProperties": False,
+            },
+        },
+        "went_well": {"type": "array", "items": {"type": "string"}},
+        "work_on": {
+            "type": "array",
+            "description": "The 3 most valuable improvements, most important first",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Short imperative headline"},
+                    "evidence": {"type": "string", "description": "The numbers from THIS flight"},
+                    "why": {"type": "string", "description": "Why it matters aeronautically"},
+                    "fix": {"type": "string", "description": "Concrete technique to apply next flight"},
+                },
+                "required": ["title", "evidence", "why", "fix"],
+                "additionalProperties": False,
+            },
+        },
+        "next_flight": {"type": "string", "description": "One concrete, flyable exercise"},
+    },
+    "required": ["overview", "grades", "went_well", "work_on", "next_flight"],
+    "additionalProperties": False,
+}
+
+SYSTEM_PROMPT = f"""\
 You are an experienced, encouraging CFI giving a post-flight debrief to a student
 practicing real-world procedures in Microsoft Flight Simulator 2024. You receive a
 JSON flight log: derived events (engine start, takeoff with rotation speed, touchdown
@@ -15,20 +66,13 @@ with descent rate in fpm), a downsampled telemetry trace, limit exceedances meas
 against the aircraft's own V-speeds, and the pilot's checklist activity (which
 checklists were completed, in what order, and which items the sim verified live).
 
-Write the debrief in Markdown:
+Ground every claim in the log; if data is missing, say so in the relevant field
+rather than inventing figures. Warm but honest — a good instructor names the
+problem plainly.
 
-## Flight overview — two or three sentences on what the flight was.
-## What went well — specific, evidence-based praise; cite the numbers.
-## What to work on — the 3 most valuable improvements, each tied to data in the log
-   and to the correct POH number (e.g. rotation at 62 vs Vr 55; touchdown at -450 fpm;
-   flaps extended above Vfe; run-up RPM off target; checklists skipped or run out of
-   order; items that had to be checked manually because the cockpit state never
-   matched). Explain WHY each matters aeronautically.
-## By the numbers — a small table of key figures vs targets.
-## Next flight — one concrete, flyable exercise for the next session.
-
-Ground every claim in the log. If data is missing or ambiguous, say so rather than
-inventing figures. Warm but honest — a good instructor names the problem plainly.
+Grade exactly these areas (in this order): {", ".join(GRADE_AREAS)}.
+Each grade comment must cite a number from the log (e.g. 'rotated at 62 vs Vr 55').
+'work_on' items must each tie evidence -> aeronautical why -> concrete fix.
 """
 
 
@@ -43,8 +87,8 @@ def build_prompt(summary: dict) -> str:
     )
 
 
-def generate_debrief(summary: dict) -> str:
-    """Blocking Claude call — run from a worker thread."""
+def generate_debrief(summary: dict) -> dict:
+    """Blocking Claude call — run from a worker thread. Returns the structured debrief."""
     try:
         import anthropic
     except ImportError as exc:
@@ -66,6 +110,7 @@ def generate_debrief(summary: dict) -> str:
             thinking={"type": "adaptive"},
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": build_prompt(summary)}],
+            output_config={"format": {"type": "json_schema", "schema": DEBRIEF_SCHEMA}},
         )
     except anthropic.AuthenticationError as exc:
         raise DebriefUnavailable("Anthropic API key was rejected — check ANTHROPIC_API_KEY.") from exc
@@ -74,4 +119,26 @@ def generate_debrief(summary: dict) -> str:
 
     if response.stop_reason == "refusal":
         raise DebriefUnavailable("Claude declined this request.")
-    return next(block.text for block in response.content if block.type == "text")
+    text = next(block.text for block in response.content if block.type == "text")
+    return json.loads(text)
+
+
+def debrief_to_markdown(data: dict) -> str:
+    """Plain-Markdown rendering, used when saving the debrief to disk."""
+    lines = ["# Instructor debrief", "", data["overview"], "", "## Report card", ""]
+    for grade in data["grades"]:
+        stars = "★" * grade["score"] + "☆" * (5 - grade["score"])
+        lines.append(f"- **{grade['area']}** {stars} ({grade['score']}/5) — {grade['comment']}")
+    lines += ["", "## What went well", ""]
+    lines += [f"- {w}" for w in data["went_well"]]
+    lines += ["", "## What to work on", ""]
+    for i, item in enumerate(data["work_on"], 1):
+        lines += [
+            f"### {i}. {item['title']}",
+            f"- **Evidence:** {item['evidence']}",
+            f"- **Why it matters:** {item['why']}",
+            f"- **The fix:** {item['fix']}",
+            "",
+        ]
+    lines += ["## Next flight", "", data["next_flight"], ""]
+    return "\n".join(lines)

@@ -47,6 +47,8 @@ def parse_limits(vspeeds: list[tuple[str, str]]) -> dict[str, float]:
             limits["vno"] = speed
         elif "vfe" in lowered:
             limits["vfe"] = min(limits.get("vfe", 9999.0), speed)  # full-flap limit
+        elif "vr" in lowered and "rotate" in lowered:
+            limits["vr"] = speed
     return limits
 
 
