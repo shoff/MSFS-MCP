@@ -703,6 +703,12 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):  # noqa: N802
         self.monitor.stop()
+        # Wait out any in-flight worker threads so none is destroyed mid-run
+        # (Qt aborts the process on "QThread destroyed while running").
+        for attr in ("mcp_worker", "worker"):
+            worker = getattr(self, attr, None)
+            if worker is not None and worker.isRunning():
+                worker.wait(6000)
         super().closeEvent(event)
 
 

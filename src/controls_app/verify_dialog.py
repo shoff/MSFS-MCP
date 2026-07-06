@@ -10,7 +10,7 @@ exactly the diagnosis of a bad MSFS binding. Sim offline -> hardware-only mode.
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QColor
 
 from checklist_app import theme
-from checklist_app.sim_link import STATE_LIVE, SimLink
+from checklist_app.sim_link import STATE_LIVE, STATE_OFFLINE, SimLink
 
 from .binding_check import BindingTest, build_tests
 from .devices import DEVICE_BY_ID
@@ -115,6 +115,12 @@ class VerifyDialog(QDialog):
         self.fail_timer = QTimer(self)
         self.fail_timer.setSingleShot(True)
         self.fail_timer.timeout.connect(self._on_sim_timeout)
+        # A single restartable timer for advancing — prevents double-Skip (or
+        # Skip racing an auto-pass) from queuing two advances and wedging a test.
+        self.advance_timer = QTimer(self)
+        self.advance_timer.setSingleShot(True)
+        self.advance_timer.timeout.connect(self._advance)
+        self.sim_settled_offline = False  # True once a connect attempt has failed
 
         # hardware channel
         self.monitor.button_changed.connect(self._on_button)
@@ -134,6 +140,7 @@ class VerifyDialog(QDialog):
 
     def _advance(self) -> None:
         self.fail_timer.stop()
+        self.advance_timer.stop()
         self.idx += 1
         self.baseline = None
         t = self.current()
@@ -152,12 +159,12 @@ class VerifyDialog(QDialog):
 
     def _finish_current(self, status: str) -> None:
         t = self.current()
-        if t is None:
+        if t is None or t.status != "active":  # ignore a second finish on a done test
             return
         t.status = status
         self.fail_timer.stop()
         self._paint_row(self.idx)
-        QTimer.singleShot(ADVANCE_DELAY_MS, self._advance)
+        self.advance_timer.start(ADVANCE_DELAY_MS)  # restart, never stack
 
     def _maybe_pass(self) -> None:
         t = self.current()
@@ -165,17 +172,24 @@ class VerifyDialog(QDialog):
             return
         if t.hw_seen and t.sim_seen:
             self._finish_current("passed")
-        elif t.hw_seen and not self.sim_live:
+        elif t.hw_seen and self.sim_settled_offline:
+            # Only grade hardware-only once we KNOW the sim is unreachable — not
+            # during the initial connecting window, or we'd pass an unchecked binding.
             self._finish_current("hw_only")
         elif t.hw_seen and not self.fail_timer.isActive():
             self.fail_timer.start(SIM_FAIL_TIMEOUT_MS)  # sim has this long to react
 
     def _on_sim_timeout(self) -> None:
         t = self.current()
-        if t is not None and t.status == "active" and not t.sim_seen:
-            self._finish_current("failed")
+        if t is None or t.status != "active" or t.sim_seen:
+            return
+        # Hardware moved but the sim never reacted. Only call that a FAIL if the
+        # sim is actually reachable; if the link dropped, grade hardware-only.
+        self._finish_current("hw_only" if self.sim_settled_offline else "failed")
 
     def _restart(self) -> None:
+        self.fail_timer.stop()
+        self.advance_timer.stop()
         for t in self.tests:
             t.status, t.hw_seen, t.sim_seen = "pending", False, False
         self.idx = -1
@@ -215,6 +229,10 @@ class VerifyDialog(QDialog):
 
     def _on_sim_state(self, state: str) -> None:
         self.sim_live = state == STATE_LIVE
+        if state == STATE_OFFLINE:
+            self.sim_settled_offline = True   # a connect attempt has concluded
+        elif state == STATE_LIVE:
+            self.sim_settled_offline = False  # link recovered
         t = self.current()
         if t is not None:
             self.sub.setText(

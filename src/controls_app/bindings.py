@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+
+log = logging.getLogger("controls_app.bindings")
 
 PLANS_DIR = Path(__file__).parent / "data" / "plans"
 
@@ -79,10 +82,14 @@ class ControlPlan:
 
 
 def load_default_plans(plans_dir: Path = PLANS_DIR) -> dict[str, ControlPlan]:
-    """Load bundled plans keyed by aircraft_key."""
+    """Load bundled plans keyed by aircraft_key; skip malformed files."""
     plans = {}
     for path in sorted(plans_dir.glob("*.json")):
-        with open(path, encoding="utf-8") as f:
-            plan = ControlPlan.from_dict(json.load(f))
+        try:
+            with open(path, encoding="utf-8") as f:
+                plan = ControlPlan.from_dict(json.load(f))
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
+            log.warning("Skipping malformed plan file %s: %s", path.name, exc)
+            continue
         plans[plan.aircraft_key] = plan
     return plans

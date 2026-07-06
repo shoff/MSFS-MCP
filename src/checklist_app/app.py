@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import sys
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication,
@@ -669,10 +669,18 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):  # noqa: N802
         if hasattr(self, "sim"):
             self.sim.stop()
-            self.sim.wait(2000)
-        if getattr(self, "recorder", None) is not None and self.recorder.has_data:
+            self.sim.wait(3000)
+        # Block until the autostart probe and any debrief workers return so no
+        # QThread is destroyed mid-run (Qt aborts the process otherwise).
+        if getattr(self, "mcp_worker", None) is not None:
+            self.mcp_worker.wait(6000)
+        for child in self.findChildren(QThread):
+            if child.isRunning():
+                child.wait(6000)
+        recorder = getattr(self, "recorder", None)
+        if recorder is not None and recorder.has_data and not recorder.saved:
             try:
-                self.recorder.save()  # never lose a flight
+                recorder.save()  # safety net — don't lose an unsaved flight
             except OSError:
                 pass
         super().closeEvent(event)

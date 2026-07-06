@@ -135,9 +135,13 @@ def _tiles_widget(tiles) -> QWidget:
 # --------------------------------------------------------------------------
 
 class FlightProfileChart(QWidget):
+    MAX_PLOT_POINTS = 800  # cap painted points; a 3 h flight is ~10,800 raw samples
+
     def __init__(self, samples: list[dict], limits: dict, events: list[dict]):
         super().__init__()
-        self.samples = [s for s in samples if s.get("alt") is not None and s.get("t") is not None]
+        clean = [s for s in samples if s.get("alt") is not None and s.get("t") is not None]
+        stride = max(1, len(clean) // self.MAX_PLOT_POINTS)
+        self.samples = clean[::stride]
         self.limits = limits
         self.events = events
         self.setMinimumHeight(300)
@@ -150,7 +154,7 @@ class FlightProfileChart(QWidget):
             return True
         if "vno" in self.limits and ias > self.limits["vno"]:
             return True
-        return "vfe" in self.limits and flaps > 0.5 and ias > self.limits["vfe"]
+        return "vfe_max" in self.limits and flaps > 0.5 and ias > self.limits["vfe_max"]
 
     def paintEvent(self, event):  # noqa: N802
         p = QPainter(self)
@@ -220,11 +224,11 @@ class FlightProfileChart(QWidget):
         # -- Panel B: airspeed
         top_b = mt + panel_h + gap
         ias_vals = [s["ias"] for s in self.samples if s.get("ias") is not None]
-        smax = max(ias_vals + [self.limits.get("vfe", 0) + 10]) * 1.12 or 1
+        smax = max(ias_vals + [self.limits.get("vfe_max", 0) + 10]) * 1.12 or 1
         y_ias = draw_panel(top_b, "AIRSPEED (KIAS)", smax, lambda v: f"{v:,.0f}")
 
         # limit reference lines with direct labels
-        for key, label in (("vfe", "Vfe"), ("vno", "Vno"), ("vne", "Vne")):
+        for key, label in (("vfe_max", "Vfe"), ("vno", "Vno"), ("vne", "Vne")):
             if key in self.limits and self.limits[key] < smax:
                 y = y_ias(self.limits[key])
                 pen = QPen(QColor(theme.TEXT_FAINT), 1, Qt.PenStyle.DashLine)
@@ -366,10 +370,26 @@ class DebriefDialog(QDialog):
         self.gen_btn.setEnabled(False)
         self.gen_btn.setText("✦ Thinking…")
         self.status.setText("Asking your instructor to review the flight…")
-        self.worker = DebriefWorker(self.summary)
-        self.worker.finished_data.connect(self._on_debrief)
-        self.worker.failed.connect(self._on_failed)
-        self.worker.start()
+        # Parent to the long-lived main window, not this dialog: the Claude call
+        # can run for tens of seconds, and a QThread destroyed while running
+        # aborts the process. Signals are auto-disconnected on dialog teardown.
+        worker = DebriefWorker(self.summary)
+        worker.setParent(self.parent() or self)  # outlive the dialog; avoid mid-run abort
+        worker.finished_data.connect(self._on_debrief)
+        worker.failed.connect(self._on_failed)
+        self.worker = worker
+        worker.start()
+
+    def done(self, result: int) -> None:  # noqa: N802
+        # Stop late results from calling into a torn-down dialog; the worker is
+        # parented to the main window, which waits for it on app close.
+        if self.worker is not None:
+            try:
+                self.worker.finished_data.disconnect(self._on_debrief)
+                self.worker.failed.disconnect(self._on_failed)
+            except (TypeError, RuntimeError):
+                pass
+        super().done(result)
 
     def _on_debrief(self, data: dict) -> None:
         self.debrief_data = data

@@ -46,7 +46,10 @@ def parse_limits(vspeeds: list[tuple[str, str]]) -> dict[str, float]:
         elif "vno" in lowered:
             limits["vno"] = speed
         elif "vfe" in lowered:
-            limits["vfe"] = min(limits.get("vfe", 9999.0), speed)  # full-flap limit
+            # Track the least-restrictive flap limit; we can't map a flap detent
+            # to its specific Vfe generically, so we only flag speeds above the
+            # HIGHEST Vfe — a real violation at any flap setting, never a false one.
+            limits["vfe_max"] = max(limits.get("vfe_max", 0.0), speed)
         elif "vr" in lowered and "rotate" in lowered:
             limits["vr"] = speed
     return limits
@@ -75,6 +78,7 @@ class FlightRecorder:
 
     _prev: dict = field(default_factory=dict)
     _last_sample_t: float | None = None
+    saved: bool = False  # set once persisted, so we don't double-save on close
 
     # ------------------------------------------------------------- config
     def set_aircraft(self, name: str, vspeeds: list[tuple[str, str]]) -> None:
@@ -144,18 +148,20 @@ class FlightRecorder:
             if dt > 0:
                 fpm = round((alt - prev["alt"]) * 60.0 / dt)
 
-        # limit exceedances (airborne only)
-        if ias is not None and on_ground is not None and on_ground <= 0.5:
+        # limit exceedances (airborne only). Accumulate real elapsed time between
+        # polls, not a per-callback +1 (SimLink polls at 2 Hz, not 1 Hz).
+        dt = now - prev["now"] if prev.get("now") is not None else 0.0
+        if ias is not None and on_ground is not None and on_ground <= 0.5 and 0 < dt <= 5:
             checks = []
             if "vne" in self.limits and ias > self.limits["vne"]:
                 checks.append("Vne exceeded")
             elif "vno" in self.limits and ias > self.limits["vno"]:
                 checks.append("above Vno")
-            if "vfe" in self.limits and flaps is not None and flaps > 0.5 and ias > self.limits["vfe"]:
+            if "vfe_max" in self.limits and flaps is not None and flaps > 0.5 and ias > self.limits["vfe_max"]:
                 checks.append("flaps above Vfe")
             for kind in checks:
-                entry = self.exceedances.setdefault(kind, {"seconds": 0, "max_ias": 0.0})
-                entry["seconds"] += 1
+                entry = self.exceedances.setdefault(kind, {"seconds": 0.0, "max_ias": 0.0})
+                entry["seconds"] = round(entry["seconds"] + dt, 1)
                 entry["max_ias"] = max(entry["max_ias"], round(ias, 1))
 
         # 1 Hz sample trail
@@ -217,4 +223,5 @@ class FlightRecorder:
         path = directory / f"flight-{stamp}.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self.summary(), f, indent=2)
+        self.saved = True
         return path

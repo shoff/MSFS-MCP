@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+
+log = logging.getLogger("checklist_app.models")
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -101,10 +104,17 @@ def _parse_aircraft(raw: dict) -> Aircraft:
 
 
 def load_aircraft(data_dir: Path = DATA_DIR) -> list[Aircraft]:
-    """Load every aircraft JSON in the data directory, sorted by name."""
+    """Load every aircraft JSON in the data directory, sorted by name.
+
+    A malformed file is skipped with a logged warning rather than crashing the
+    whole app — one bad data file shouldn't take down every aircraft.
+    """
     aircraft = []
     for path in sorted(data_dir.glob("*.json")):
-        with open(path, encoding="utf-8") as f:
-            aircraft.append(_parse_aircraft(json.load(f)))
+        try:
+            with open(path, encoding="utf-8") as f:
+                aircraft.append(_parse_aircraft(json.load(f)))
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
+            log.warning("Skipping malformed aircraft file %s: %s", path.name, exc)
     aircraft.sort(key=lambda a: a.name)
     return aircraft

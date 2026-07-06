@@ -31,7 +31,7 @@ def test_parse_limits_c172():
     aircraft = next(a for a in load_aircraft() if "172" in a.name)
     limits = parse_limits(aircraft.vspeeds)
     assert limits["vne"] == 163 and limits["vno"] == 129
-    assert limits["vfe"] == 85  # full-flap limit, not the 10° limit
+    assert limits["vfe_max"] == 110  # least-restrictive flap limit (never false-flag)
     assert limits["vr"] == 55
 
 
@@ -63,12 +63,24 @@ def test_exceedance_flaps_above_vfe():
     rec = c172_recorder()
     t = 0.0
     rec.update(sample(1, 0, 1000), now=t)
-    t += 1; rec.update(sample(0, 100, 1500, flaps=0), now=t)   # clean at 100 — fine
+    # 10° flaps at 100 kt is LEGAL (Vfe 110) — must NOT be flagged.
+    t += 1; rec.update(sample(0, 100, 1500, flaps=1), now=t)
+    assert "flaps above Vfe" not in rec.exceedances
+    # Above the least-restrictive Vfe (110) with flaps out — real violation.
     for _ in range(3):
-        t += 1; rec.update(sample(0, 95, 1500, flaps=1), now=t)  # flaps out above Vfe 85
-    assert rec.exceedances["flaps above Vfe"]["seconds"] == 3
-    assert rec.exceedances["flaps above Vfe"]["max_ias"] == 95
-    assert "Vne exceeded" not in rec.exceedances
+        t += 1; rec.update(sample(0, 115, 1500, flaps=1), now=t)
+    assert rec.exceedances["flaps above Vfe"]["seconds"] == 3   # 3 x 1 s polls
+    assert rec.exceedances["flaps above Vfe"]["max_ias"] == 115
+
+
+def test_exceedance_seconds_track_real_time_at_2hz():
+    """Regression: exceedance seconds must count elapsed time, not callbacks."""
+    rec = c172_recorder()
+    rec.update(sample(1, 0, 1000), now=0.0)
+    # 10 half-second polls above Vne (163) = 5 real seconds, not 10.
+    for i in range(1, 11):
+        rec.update(sample(0, 170, 3000), now=i * 0.5)
+    assert rec.exceedances["Vne exceeded"]["seconds"] == 5.0
 
 
 def test_checklist_logging_and_summary():
@@ -165,7 +177,7 @@ def test_build_tiles_status_colors():
     t += 1; rec.update(sample(1, 55, 1000), now=t)
     t += 1; rec.update(sample(0, 62, 1010), now=t)                # rotate at 62 (Vr 55 -> +7 amber)
     for _ in range(3):
-        t += 1; rec.update(sample(0, 95, 1200, flaps=1), now=t)   # flaps above Vfe
+        t += 1; rec.update(sample(0, 115, 1200, flaps=1), now=t)  # flaps above Vfe_max 110
     t += 1; rec.update(sample(0, 60, 1005), now=t)
     t += 1; rec.update(sample(0, 60, 997), now=t)                 # -480 fpm
     t += 1; rec.update(sample(1, 54, 996), now=t)
