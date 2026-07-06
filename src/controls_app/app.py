@@ -379,6 +379,14 @@ class MainWindow(QMainWindow):
         self.write_btn.clicked.connect(self._write_to_msfs)
         lay.addWidget(self.write_btn)
 
+        self.verify_btn = QPushButton("▶ Verify live", objectName="WriteButton")
+        self.verify_btn.setToolTip(
+            "Guided check with MSFS running: operate each control when prompted;\n"
+            "the app confirms the hardware moved AND the sim reacted."
+        )
+        self.verify_btn.clicked.connect(self._verify_live)
+        lay.addWidget(self.verify_btn)
+
         pin = QToolButton()
         pin.setText("⏏ On top")
         pin.setCheckable(True)
@@ -655,6 +663,20 @@ class MainWindow(QMainWindow):
             )
             return
         dialog = WriteDialog(self, self.plan, device_id, self.maps[device_id])
+        dialog.exec()
+
+    def _verify_live(self) -> None:
+        from .verify_dialog import VerifyDialog
+
+        device_id = self._current_device_id()
+        if not device_id or device_id == "keyboard_mouse":
+            QMessageBox.information(
+                self, "Pick a device",
+                "Select the Alpha, Bravo or rudder pedals in the sidebar to verify.",
+            )
+            return
+        bindings = self.plan.devices.get(device_id, [])
+        dialog = VerifyDialog(self, device_id, bindings, self.maps[device_id], self.monitor)
         dialog.exec()
 
     # -------------------------------------------------------------- window

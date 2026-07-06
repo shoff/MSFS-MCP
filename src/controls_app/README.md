@@ -24,6 +24,25 @@ the diagram, press/move the real input, done — saved to
 profile writing. (The shipped defaults are good starting points but hardware
 firmware revisions vary — a one-time Learn pass per device is recommended.)
 
+## Live binding verification ▶
+
+After writing (or setting up bindings any way you like), **▶ Verify live**
+closes the loop with MSFS running: the app walks you through each binding —
+*"Now operate: Lever 1 (black — throttle handle)"* — and watches two
+independent channels at once:
+
+- **HW** — the mapped physical input actually moved (same monitor as the visualizer)
+- **SIM** — the SimVar that binding should drive changed from its baseline
+  (throttle lever position, battery state, flap handle index, AP annunciators, …)
+
+Both seen → **✓ PASS**. Hardware seen but the sim silent for 6 seconds →
+**✗ FAIL**, which is precisely the diagnosis of a wrong MSFS binding — rebind
+that one control and re-run. With the sim closed it degrades to a
+hardware-only check. A few controls (the Bravo's selector knob, spare
+rockers) have no observable SimVar and are listed as check-by-eye.
+
+![verify](../../docs/controls-app-verify.png)
+
 ## Writing bindings into MSFS
 
 **⭳ Write to MSFS** takes the current device's plan and writes it straight
