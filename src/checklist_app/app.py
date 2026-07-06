@@ -290,7 +290,7 @@ class MainWindow(QMainWindow):
         self.debrief_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.debrief_btn.setToolTip(
             "Post-flight debrief: local flight stats now, and an instructor-style\n"
-            "review from Claude (needs ANTHROPIC_API_KEY)."
+            "review from an LLM (Claude, OpenAI, or a local model — see MSFS_COMPANION_LLM)."
         )
         self.debrief_btn.clicked.connect(self._open_debrief)
         lay.addWidget(self.debrief_btn)

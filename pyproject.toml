@@ -22,6 +22,9 @@ dependencies = [
 dev = ["pytest>=8.0", "ruff>=0.4"]
 checklist = ["PyQt6>=6.6", "anthropic>=0.40"]
 controls = ["PyQt6>=6.6", "anthropic>=0.40", "pygame>=2.5"]
+# For MSFS_COMPANION_LLM=openai or =local (Ollama / LM Studio / llama.cpp, all
+# OpenAI-compatible). The anthropic provider (default) does not need this.
+openai = ["openai>=1.30"]
 
 [project.scripts]
 msfs-mcp = "msfs_mcp.server:main"

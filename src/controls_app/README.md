@@ -99,21 +99,42 @@ Press **✦ Ask Claude** and the app sends:
 - the current binding plan,
 - your free-text notes ("no pedals yet", "practicing IFR", …)
 
-Claude (`claude-opus-4-8` by default, or `$MSFS_COMPANION_MODEL`; structured
-JSON output) returns a reviewed plan —
-corrected bindings, filled gaps, keyboard substitutions for missing hardware —
-and refreshed coaching. The result replaces the table in place; the status bar
-shows the plan source.
+The LLM (structured JSON output) returns a reviewed plan — corrected bindings,
+filled gaps, keyboard substitutions for missing hardware — and refreshed
+coaching. The result replaces the table in place; the status bar shows the plan
+source (the model that produced it).
 
-Requires the `ANTHROPIC_API_KEY` environment variable
-(get one at <https://platform.claude.com>). Without it the app still fully
-works using the built-in plans and tells you why the button can't run.
+### Choosing an LLM provider
+
+Set `MSFS_COMPANION_LLM` (this applies to the flight debrief too):
+
+| `MSFS_COMPANION_LLM` | Backend | Needs | Default model |
+|---|---|---|---|
+| `anthropic` (default) | Claude | `ANTHROPIC_API_KEY` | `claude-opus-4-8` |
+| `openai` | OpenAI or any hosted OpenAI-compatible API | `OPENAI_API_KEY` | `gpt-4o` |
+| `local` (aliases: `ollama`, `llama`) | A local OpenAI-compatible server — Ollama, LM Studio, llama.cpp, vLLM | nothing (runs offline) | `llama3.1` |
+
+- `MSFS_COMPANION_MODEL` overrides the model for any provider.
+- `MSFS_COMPANION_LLM_BASE_URL` overrides the endpoint (local default
+  `http://localhost:11434/v1`, Ollama's OpenAI-compatible port).
+- `openai`/`local` need the `openai` package: `pip install -e ".[controls,openai]"`.
+
+Example — run fully offline with a local Llama via Ollama:
+
+```bash
+ollama serve &            # start the local server
+ollama pull llama3.1      # once
+export MSFS_COMPANION_LLM=local
+```
+
+Without any credentials the app still fully works using the built-in plans and
+tells you exactly which key to set (or to switch to a local model).
 
 ## Install & run
 
 ```bash
 pip install -e ".[controls]"
-setx ANTHROPIC_API_KEY "sk-ant-..."   # optional, enables Ask Claude (Windows)
+setx ANTHROPIC_API_KEY "sk-ant-..."   # optional, enables Ask (Windows); or use MSFS_COMPANION_LLM
 msfs-controls                          # or: python -m controls_app
 ```
 

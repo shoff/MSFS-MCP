@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from companion_common import claude
+from companion_common import llm
 
 GRADE_AREAS = [
     "Checklist discipline",
@@ -87,16 +87,13 @@ def build_prompt(summary: dict) -> str:
 
 
 def generate_debrief(summary: dict) -> dict:
-    """Blocking Claude call — run from a worker thread. Returns the structured debrief."""
-    return claude.call_json(
+    """Blocking LLM call — run from a worker thread. Returns the structured debrief."""
+    return llm.call_json(
         system=SYSTEM_PROMPT,
         user=build_prompt(summary),
         schema=DEBRIEF_SCHEMA,
         error_cls=DebriefUnavailable,
-        no_credentials_msg=(
-            "No Anthropic credentials found — set ANTHROPIC_API_KEY to enable the "
-            "instructor debrief. The flight statistics above are still saved locally."
-        ),
+        fallback_note="The flight statistics above are still saved locally.",
     )
 
 

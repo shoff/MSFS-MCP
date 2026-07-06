@@ -1,10 +1,11 @@
-"""MSFS 2024 controls setup advisor — dark, minimal, Claude-assisted.
+"""MSFS 2024 controls setup advisor — dark, minimal, LLM-assisted.
 
 Run with ``msfs-controls`` or ``python -m controls_app``.
 
 Features: live device visualizers (press a button on the Bravo and it lights
-up), Learn mode to map physical inputs exactly, Claude-reviewed binding plans,
-and direct writing of bindings into MSFS input profiles (with backups).
+up), Learn mode to map physical inputs exactly, LLM-reviewed binding plans
+(Claude, OpenAI, or a local Llama-style model — see MSFS_COMPANION_LLM), and
+direct writing of bindings into MSFS input profiles (with backups).
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from companion_common import theme
+from companion_common import llm, theme
 
 from . import advisor, msfs_profiles
 from .bindings import ControlPlan, load_default_plans
@@ -413,7 +414,7 @@ class MainWindow(QMainWindow):
         self.aircraft_combo.currentIndexChanged.connect(lambda _i: self._load_plan_for_aircraft())
         lay.addWidget(self.aircraft_combo)
 
-        self.ask_btn = QPushButton("✦ Ask Claude", objectName="AskButton")
+        self.ask_btn = QPushButton("✦ Ask AI", objectName="AskButton")
         self.ask_btn.setToolTip(
             "Send your aircraft, detected hardware and the current plan to Claude\n"
             "for a tailored review (needs ANTHROPIC_API_KEY)."
@@ -716,7 +717,7 @@ class MainWindow(QMainWindow):
         key = self._current_aircraft_key()
         self.ask_btn.setEnabled(False)
         self.ask_btn.setText("✦ Thinking…")
-        self.status.setText("Asking Claude to review this setup…")
+        self.status.setText(f"Asking {llm.model_label()} to review this setup…")
         self.worker = AdvisorWorker(
             {
                 "aircraft_key": key,
@@ -745,7 +746,7 @@ class MainWindow(QMainWindow):
 
     def _reset_ask_button(self) -> None:
         self.ask_btn.setEnabled(True)
-        self.ask_btn.setText("✦ Ask Claude")
+        self.ask_btn.setText("✦ Ask AI")
 
     # ------------------------------------------------------------ profiles
     def _write_to_msfs(self) -> None:

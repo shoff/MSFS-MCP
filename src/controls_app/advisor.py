@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from companion_common import claude
+from companion_common import llm
 
 from .bindings import ControlPlan
 from .devices import DEVICES
@@ -114,21 +114,17 @@ def suggest_plan(
     current_plan: ControlPlan,
     user_notes: str = "",
 ) -> ControlPlan:
-    """Ask Claude for an improved plan. Blocking — call from a worker thread."""
-    raw = claude.call_json(
+    """Ask the LLM for an improved plan. Blocking — call from a worker thread."""
+    raw = llm.call_json(
         system=SYSTEM_PROMPT,
         user=_build_user_prompt(
             aircraft_name, aircraft_context, detected, current_plan, user_notes
         ),
         schema=PLAN_SCHEMA,
         error_cls=AdvisorUnavailable,
-        no_credentials_msg=(
-            "No Anthropic credentials found. Set the ANTHROPIC_API_KEY environment "
-            "variable (https://platform.claude.com) and restart, or keep using the "
-            "built-in default plan."
-        ),
-        refusal_msg="Claude declined this request; keeping the current plan.",
+        fallback_note="Or keep using the built-in default plan.",
+        refusal_msg="The model declined this request; keeping the current plan.",
     )
     raw["aircraft_key"] = aircraft_key
     raw["aircraft_name"] = aircraft_name
-    return ControlPlan.from_dict(raw, source=f"Claude ({claude.MODEL})")
+    return ControlPlan.from_dict(raw, source=llm.model_label())
