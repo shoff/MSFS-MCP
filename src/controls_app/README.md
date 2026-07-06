@@ -99,7 +99,8 @@ Press **✦ Ask Claude** and the app sends:
 - the current binding plan,
 - your free-text notes ("no pedals yet", "practicing IFR", …)
 
-Claude (`claude-opus-4-8`, structured JSON output) returns a reviewed plan —
+Claude (`claude-opus-4-8` by default, or `$MSFS_COMPANION_MODEL`; structured
+JSON output) returns a reviewed plan —
 corrected bindings, filled gaps, keyboard substitutions for missing hardware —
 and refreshed coaching. The result replaces the table in place; the status bar
 shows the plan source.

@@ -8,12 +8,11 @@ validated JSON (structured outputs), plus coaching on how to fly with it.
 from __future__ import annotations
 
 import json
-import os
+
+from companion_common import claude
 
 from .bindings import ControlPlan
 from .devices import DEVICES
-
-MODEL = "claude-opus-4-8"
 
 BINDING_SCHEMA = {
     "type": "object",
@@ -116,47 +115,20 @@ def suggest_plan(
     user_notes: str = "",
 ) -> ControlPlan:
     """Ask Claude for an improved plan. Blocking — call from a worker thread."""
-    try:
-        import anthropic
-    except ImportError as exc:
-        raise AdvisorUnavailable(
-            "The 'anthropic' package is not installed. Run: pip install anthropic"
-        ) from exc
-
-    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
-        raise AdvisorUnavailable(
+    raw = claude.call_json(
+        system=SYSTEM_PROMPT,
+        user=_build_user_prompt(
+            aircraft_name, aircraft_context, detected, current_plan, user_notes
+        ),
+        schema=PLAN_SCHEMA,
+        error_cls=AdvisorUnavailable,
+        no_credentials_msg=(
             "No Anthropic credentials found. Set the ANTHROPIC_API_KEY environment "
             "variable (https://platform.claude.com) and restart, or keep using the "
             "built-in default plan."
-        )
-
-    client = anthropic.Anthropic()
-    try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=16000,
-            thinking={"type": "adaptive"},
-            system=SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": _build_user_prompt(
-                        aircraft_name, aircraft_context, detected, current_plan, user_notes
-                    ),
-                }
-            ],
-            output_config={"format": {"type": "json_schema", "schema": PLAN_SCHEMA}},
-        )
-    except anthropic.AuthenticationError as exc:
-        raise AdvisorUnavailable("Anthropic API key was rejected — check ANTHROPIC_API_KEY.") from exc
-    except anthropic.APIConnectionError as exc:
-        raise AdvisorUnavailable("Could not reach the Anthropic API — check your connection.") from exc
-
-    if response.stop_reason == "refusal":
-        raise AdvisorUnavailable("Claude declined this request; keeping the current plan.")
-
-    text = next(block.text for block in response.content if block.type == "text")
-    raw = json.loads(text)
+        ),
+        refusal_msg="Claude declined this request; keeping the current plan.",
+    )
     raw["aircraft_key"] = aircraft_key
     raw["aircraft_name"] = aircraft_name
-    return ControlPlan.from_dict(raw, source=f"Claude ({MODEL})")
+    return ControlPlan.from_dict(raw, source=f"Claude ({claude.MODEL})")

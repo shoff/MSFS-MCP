@@ -7,9 +7,8 @@ render it graphically instead of as one text blob.
 from __future__ import annotations
 
 import json
-import os
 
-MODEL = "claude-opus-4-8"
+from companion_common import claude
 
 GRADE_AREAS = [
     "Checklist discipline",
@@ -89,38 +88,16 @@ def build_prompt(summary: dict) -> str:
 
 def generate_debrief(summary: dict) -> dict:
     """Blocking Claude call — run from a worker thread. Returns the structured debrief."""
-    try:
-        import anthropic
-    except ImportError as exc:
-        raise DebriefUnavailable(
-            "The 'anthropic' package is not installed. Run: pip install anthropic"
-        ) from exc
-
-    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
-        raise DebriefUnavailable(
+    return claude.call_json(
+        system=SYSTEM_PROMPT,
+        user=build_prompt(summary),
+        schema=DEBRIEF_SCHEMA,
+        error_cls=DebriefUnavailable,
+        no_credentials_msg=(
             "No Anthropic credentials found — set ANTHROPIC_API_KEY to enable the "
             "instructor debrief. The flight statistics above are still saved locally."
-        )
-
-    client = anthropic.Anthropic()
-    try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=16000,
-            thinking={"type": "adaptive"},
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": build_prompt(summary)}],
-            output_config={"format": {"type": "json_schema", "schema": DEBRIEF_SCHEMA}},
-        )
-    except anthropic.AuthenticationError as exc:
-        raise DebriefUnavailable("Anthropic API key was rejected — check ANTHROPIC_API_KEY.") from exc
-    except anthropic.APIConnectionError as exc:
-        raise DebriefUnavailable("Could not reach the Anthropic API — check your connection.") from exc
-
-    if response.stop_reason == "refusal":
-        raise DebriefUnavailable("Claude declined this request.")
-    text = next(block.text for block in response.content if block.type == "text")
-    return json.loads(text)
+        ),
+    )
 
 
 def debrief_to_markdown(data: dict) -> str:
