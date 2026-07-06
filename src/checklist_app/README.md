@@ -58,6 +58,29 @@ Requires the base package's `SimConnect` dependency (installed with
 `pip install -e .`) and MSFS loaded into a flight; it degrades to a grey
 "○ SIM" chip anywhere else.
 
+## Post-flight debrief 🎓
+
+While the sim link is live, a flight recorder rides along: a 1 Hz telemetry
+trace (speed, altitude, RPM, flaps, throttle/mixture, on-ground) plus derived
+events — engine start/stop, takeoff with **rotation speed**, touchdown with
+**descent rate** (computed from altitude deltas, so it's unit-safe), and
+limit exceedances measured against the aircraft's own V-speeds (Vne, Vno,
+flaps above Vfe). Every checklist action is logged too, including whether the
+sim verified it live or you checked it manually.
+
+Press **🎓 Debrief** any time:
+
+- **Local stats** appear instantly and work offline: takeoffs/landings with
+  numbers, max speed/altitude, exceedance warnings, checklist completion.
+- **✦ Instructor debrief** sends the flight log to Claude, which writes a
+  CFI-style review in Markdown: what went well, the three most valuable
+  things to work on (each tied to your numbers vs the POH numbers), a
+  by-the-numbers table, and a concrete exercise for the next flight.
+  Needs `ANTHROPIC_API_KEY`.
+- **Save** writes the flight JSON + debrief Markdown to
+  `~/.msfs_companion/flights/`; the flight log is also auto-saved when you
+  close the app so a session is never lost.
+
 ## Using it with MSFS 2024
 
 1. Run MSFS in **borderless windowed mode** (General Options → Graphics →

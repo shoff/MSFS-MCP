@@ -208,4 +208,16 @@ QLabel#Hint {{
     color: {TEXT_FAINT};
     font-size: 11px;
 }}
+
+/* ---------- dialogs (debrief etc.) ---------- */
+QDialog {{ background: {BG}; }}
+QDialog QLabel {{ color: {TEXT}; }}
+QTextBrowser {{
+    background: {PANEL_ALT};
+    color: {TEXT};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+}}
 """

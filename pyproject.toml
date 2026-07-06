@@ -20,7 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4"]
-checklist = ["PyQt6>=6.6"]
+checklist = ["PyQt6>=6.6", "anthropic>=0.40"]
 controls = ["PyQt6>=6.6", "anthropic>=0.40", "pygame>=2.5"]
 
 [project.scripts]

@@ -244,11 +244,19 @@ class MainWindow(QMainWindow):
         self._load_aircraft(self.aircraft)
         self.pin_btn.setChecked(True)
 
+        # flight recorder (feeds the post-flight debrief)
+        from .flight_log import RECORDER_VARS, FlightRecorder
+
+        self.recorder = FlightRecorder()
+        self.recorder.set_aircraft(self.aircraft.name, self.aircraft.vspeeds)
+        self._completed_sections: set[str] = set()
+
         # live sim verification
         self.sim_state = STATE_OFFLINE
         self.sim = SimLink(self)
         self.sim.state_changed.connect(self._on_sim_state)
         self.sim.values_read.connect(self._on_sim_values)
+        self.sim.set_base_watch(set(RECORDER_VARS))
         self.sim.start()
 
         # make sure the shared MCP server is up (detached; survives app close)
@@ -276,6 +284,16 @@ class MainWindow(QMainWindow):
             self.aircraft_combo.addItem(ac.name)
         self.aircraft_combo.currentIndexChanged.connect(self._on_aircraft_change)
         lay.addWidget(self.aircraft_combo)
+
+        self.debrief_btn = QToolButton()
+        self.debrief_btn.setText("🎓 Debrief")
+        self.debrief_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.debrief_btn.setToolTip(
+            "Post-flight debrief: local flight stats now, and an instructor-style\n"
+            "review from Claude (needs ANTHROPIC_API_KEY)."
+        )
+        self.debrief_btn.clicked.connect(self._open_debrief)
+        lay.addWidget(self.debrief_btn)
 
         self.sim_chip = QToolButton()
         self.sim_chip.setText("○ SIM")
@@ -366,6 +384,9 @@ class MainWindow(QMainWindow):
     def _load_aircraft(self, aircraft: Aircraft) -> None:
         self.aircraft = aircraft
         aircraft.reset()
+        if hasattr(self, "recorder"):
+            self.recorder.set_aircraft(aircraft.name, aircraft.vspeeds)
+            self._completed_sections.clear()
         self._populate_sidebar()
 
     def _populate_sidebar(self) -> None:
@@ -498,6 +519,8 @@ class MainWindow(QMainWindow):
         row.item.checked = not row.item.checked
         if not row.item.checked:
             row.item.sim_checked = False
+        elif self.section is not None:
+            self.recorder.log_item(self.section.name, row.item.challenge, row.item.response, via_sim=False)
         row.update()
         if row.item.checked:
             self.cur = self._first_unchecked()
@@ -513,6 +536,8 @@ class MainWindow(QMainWindow):
         row.item.checked = not row.item.checked
         if not row.item.checked:
             row.item.sim_checked = False
+        elif self.section is not None:
+            self.recorder.log_item(self.section.name, row.item.challenge, row.item.response, via_sim=False)
         row.update()
         if row.item.checked:
             nxt = self._first_unchecked()
@@ -543,6 +568,9 @@ class MainWindow(QMainWindow):
         self.progress.setMaximum(total)
         self.progress.setValue(self.section.done_count)
         self.complete_badge.setVisible(self.section.complete)
+        if self.section.complete and self.section.name not in self._completed_sections:
+            self._completed_sections.add(self.section.name)
+            self.recorder.log_section_complete(self.section.name)
         self._refresh_sidebar_counts()
 
     # ------------------------------------------------------ section nav
@@ -594,7 +622,10 @@ class MainWindow(QMainWindow):
         Cascades: if checking the current item makes the next one current and
         the same snapshot already satisfies it, it checks too.
         """
-        if self.sim_state != STATE_LIVE or not self.check_rows:
+        if self.sim_state != STATE_LIVE:
+            return
+        self.recorder.update(values)  # feed the flight recorder / debrief
+        if not self.check_rows:
             return
         advanced = False
         for _ in range(len(self.check_rows)):
@@ -605,6 +636,8 @@ class MainWindow(QMainWindow):
                 break
             row.item.checked = True
             row.item.sim_checked = True
+            if self.section is not None:
+                self.recorder.log_item(self.section.name, row.item.challenge, row.item.response, via_sim=True)
             row.update()
             self.cur = self._first_unchecked()
             advanced = True
@@ -628,10 +661,20 @@ class MainWindow(QMainWindow):
         if self.isVisible():
             self.show()  # re-show required after changing window flags
 
+    def _open_debrief(self) -> None:
+        from .debrief_dialog import DebriefDialog
+
+        DebriefDialog(self, self.recorder).exec()
+
     def closeEvent(self, event):  # noqa: N802
         if hasattr(self, "sim"):
             self.sim.stop()
             self.sim.wait(2000)
+        if getattr(self, "recorder", None) is not None and self.recorder.has_data:
+            try:
+                self.recorder.save()  # never lose a flight
+            except OSError:
+                pass
         super().closeEvent(event)
 
     def keyPressEvent(self, event):  # noqa: N802

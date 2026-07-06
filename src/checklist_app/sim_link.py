@@ -41,6 +41,7 @@ class SimLink(QThread):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._watch: set[str] = set()
+        self._base_watch: set[str] = set()  # always-on vars (flight recorder)
         self._watch_lock = threading.Lock()
         self._stop = threading.Event()
         self._kick = threading.Event()   # wake the retry sleep for manual reconnect
@@ -51,6 +52,10 @@ class SimLink(QThread):
     def set_watch(self, names: set[str]) -> None:
         with self._watch_lock:
             self._watch = set(names)
+
+    def set_base_watch(self, names: set[str]) -> None:
+        with self._watch_lock:
+            self._base_watch = set(names)
 
     def request_reconnect(self) -> None:
         self._kick.set()
@@ -100,7 +105,7 @@ class SimLink(QThread):
 
             self._emit_state(STATE_LIVE)
             with self._watch_lock:
-                watch = list(self._watch)
+                watch = list(self._watch | self._base_watch)
             if watch:
                 try:
                     values = client.get_many(watch)
