@@ -342,6 +342,13 @@ class MainWindow(QMainWindow):
         self.monitor.start()
         QApplication.instance().installEventFilter(self)
 
+        # make sure the shared MCP server is up (detached; survives app close)
+        from checklist_app.sim_link import McpAutostartWorker
+
+        self.mcp_worker = McpAutostartWorker(self)
+        self.mcp_worker.result.connect(self._on_mcp_autostart)
+        self.mcp_worker.start()
+
     # -------------------------------------------------------------- header
     def _build_header(self) -> QWidget:
         header = QWidget(objectName="Header")
@@ -678,6 +685,15 @@ class MainWindow(QMainWindow):
         bindings = self.plan.devices.get(device_id, [])
         dialog = VerifyDialog(self, device_id, bindings, self.maps[device_id], self.monitor)
         dialog.exec()
+
+    def _on_mcp_autostart(self, status: str) -> None:
+        message = {
+            "started": "MCP server started ✓ (http://127.0.0.1:8787/mcp)",
+            "already-running": "MCP server already running ✓",
+            "failed": "MCP autostart failed — see ~/.msfs_companion/mcp-server.log",
+        }.get(status)
+        if message:
+            self.status.setText(message)
 
     # -------------------------------------------------------------- window
     def _on_pin_toggle(self, on: bool) -> None:

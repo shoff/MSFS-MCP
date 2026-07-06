@@ -20,6 +20,20 @@ STATE_CONNECTING = "connecting"
 STATE_LIVE = "live"
 
 
+class McpAutostartWorker(QThread):
+    """Fire-and-report: make sure the shared MCP server is up (see msfs_mcp.autostart)."""
+
+    result = pyqtSignal(str)  # disabled | already-running | started | failed
+
+    def run(self):
+        try:
+            from msfs_mcp.autostart import ensure_server_running
+
+            self.result.emit(ensure_server_running())
+        except Exception:
+            self.result.emit("failed")
+
+
 class SimLink(QThread):
     values_read = pyqtSignal(dict)   # {simvar: value}
     state_changed = pyqtSignal(str)  # offline | connecting | live

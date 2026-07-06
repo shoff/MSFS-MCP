@@ -64,6 +64,28 @@ pytest -q
 
 (If you `pip install -e .`, you can use the `msfs-mcp` console script instead of `python -m msfs_mcp.server`.)
 
+### HTTP mode & auto-start from the companion apps
+
+The server also runs as a shared HTTP (streamable-http) service:
+
+```powershell
+msfs-mcp --transport http --port 8787    # or MSFS_MCP_TRANSPORT=http
+```
+
+Launching **either companion app** (`msfs-checklist` / `msfs-controls`)
+automatically checks `127.0.0.1:8787` and starts this HTTP instance if it
+isn't already running — detached, so it keeps serving after the app closes.
+Server output goes to `~/.msfs_companion/mcp-server.log`; set
+`MSFS_COMPANION_AUTOSTART=0` to opt out, `MSFS_MCP_PORT` to move the port.
+MCP clients that support HTTP servers (e.g. Claude Code) can then attach at
+`http://127.0.0.1:8787/mcp`:
+
+```bash
+claude mcp add --transport http msfs2024 http://127.0.0.1:8787/mcp
+```
+
+Stdio remains the default transport, so the Claude Desktop config above is unchanged.
+
 ## Tool surface (23 tools)
 
 **Connection** — `connection_status`, `connect_sim`

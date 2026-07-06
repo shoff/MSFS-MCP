@@ -301,10 +301,34 @@ def fly_to_heading_altitude(heading: str, altitude: str) -> str:
 
 
 def main() -> None:
-    """Console entry point (stdio transport)."""
-    log.info("Starting MSFS 2024 MCP server (stdio). Layers: SC=%s FSUIPC=%s MEM=%s",
-             CONFIG.enable_simconnect, CONFIG.enable_fsuipc, CONFIG.enable_memory)
-    mcp.run()
+    """Console entry point.
+
+    Default is stdio (for MCP clients that spawn the server themselves, e.g.
+    Claude Desktop). ``--transport http`` serves streamable-http on a local
+    port instead — that's what the companion GUI apps auto-start so a single
+    shared server instance can outlive them and be reached at a URL.
+    """
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(prog="msfs-mcp")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default=os.environ.get("MSFS_MCP_TRANSPORT", "stdio"),
+    )
+    parser.add_argument("--host", default=os.environ.get("MSFS_MCP_HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(os.environ.get("MSFS_MCP_PORT", "8787")))
+    args = parser.parse_args()
+
+    log.info("Starting MSFS 2024 MCP server (%s). Layers: SC=%s FSUIPC=%s MEM=%s",
+             args.transport, CONFIG.enable_simconnect, CONFIG.enable_fsuipc, CONFIG.enable_memory)
+    if args.transport == "http":
+        mcp.settings.host = args.host
+        mcp.settings.port = args.port
+        mcp.run(transport="streamable-http")
+    else:
+        mcp.run()
 
 
 if __name__ == "__main__":

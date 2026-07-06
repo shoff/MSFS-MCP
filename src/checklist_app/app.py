@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
 
 from . import theme
 from .models import Aircraft, ChecklistItem, ChecklistSection, load_aircraft
-from .sim_link import STATE_CONNECTING, STATE_LIVE, STATE_OFFLINE, SimLink
+from .sim_link import McpAutostartWorker, STATE_CONNECTING, STATE_LIVE, STATE_OFFLINE, SimLink
 from .verify import parse_verify, satisfied, vars_needed
 
 GROUP_LABELS = {"Normal": "NORMAL PROCEDURES", "Emergency": "EMERGENCY", "Abnormal": "ABNORMAL"}
@@ -251,6 +251,11 @@ class MainWindow(QMainWindow):
         self.sim.values_read.connect(self._on_sim_values)
         self.sim.start()
 
+        # make sure the shared MCP server is up (detached; survives app close)
+        self.mcp_worker = McpAutostartWorker(self)
+        self.mcp_worker.result.connect(self._on_mcp_autostart)
+        self.mcp_worker.start()
+
     # ------------------------------------------------------------- header
     def _build_header(self) -> QWidget:
         header = QWidget(objectName="Header")
@@ -340,11 +345,11 @@ class MainWindow(QMainWindow):
         reset.clicked.connect(self.reset_section)
         lay.addWidget(reset)
 
-        hint = QLabel(
+        self.hint = QLabel(
             "Space check · ↑↓ move · [ ] checklist · E emergency · Ctrl+↑↓ opacity",
             objectName="Hint",
         )
-        lay.addWidget(hint, 1)
+        lay.addWidget(self.hint, 1)
 
         self.next_btn = QPushButton("Next ▸", objectName="NextButton")
         self.next_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -606,6 +611,16 @@ class MainWindow(QMainWindow):
         if advanced:
             self._apply_current()
             self._refresh_progress()
+
+    def _on_mcp_autostart(self, status: str) -> None:
+        base = "Space check · ↑↓ move · [ ] checklist · E emergency · Ctrl+↑↓ opacity"
+        suffix = {
+            "started": "MCP server started ✓",
+            "already-running": "MCP server ✓",
+            "failed": "MCP autostart failed (~/.msfs_companion/mcp-server.log)",
+        }.get(status)
+        if suffix:
+            self.hint.setText(f"{base} · {suffix}")
 
     # ------------------------------------------------------------- window
     def _on_pin_toggle(self, on: bool) -> None:
