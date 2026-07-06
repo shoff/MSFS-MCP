@@ -17,11 +17,17 @@ class ChecklistItem:
     response: str = ""
     kind: str = "item"  # "item" (checkable) or "note" (informational line)
     memory: bool = False  # memory item — should be committed to memory
+    verify: list[str] = field(default_factory=list)  # sim conditions (see verify.py)
     checked: bool = False
+    sim_checked: bool = False  # ticked automatically by the live sim
 
     @property
     def checkable(self) -> bool:
         return self.kind == "item"
+
+    @property
+    def verifiable(self) -> bool:
+        return self.checkable and bool(self.verify)
 
 
 @dataclass
@@ -53,6 +59,7 @@ class ChecklistSection:
     def reset(self) -> None:
         for item in self.items:
             item.checked = False
+            item.sim_checked = False
 
 
 @dataclass
@@ -77,6 +84,7 @@ def _parse_aircraft(raw: dict) -> Aircraft:
                 response=it.get("response", ""),
                 kind=it.get("kind", "item"),
                 memory=bool(it.get("memory", False)),
+                verify=[it["verify"]] if isinstance(it.get("verify"), str) else list(it.get("verify", [])),
             )
             for it in sec["items"]
         ]

@@ -30,6 +30,34 @@ pip install -e ".[checklist]"
 msfs-checklist          # or: python -m checklist_app
 ```
 
+## Live sim verification ⚡
+
+When MSFS is running on the same machine, the checklist connects to it through
+the repo's SimConnect layer and **items check themselves when you actually do
+them in the cockpit**. Flip the real battery master on and "Master switch — ON"
+ticks itself; run the throttle to 1800 RPM and the run-up item confirms.
+
+![sim verify](../../docs/checklist-app-sim.png)
+
+- The **● SIM** chip in the header shows the link state (green = live, click
+  to retry). Everything still works fully manually when the sim is offline.
+- Items with a small dot inside their circle are sim-verifiable (~110 across
+  the two aircraft). Amber dot = the sim is watching for it.
+- Verification is **strict flow order**: only the *current* item auto-checks,
+  so skipping ahead in the cockpit doesn't silently tick later items — exactly
+  how an instructor runs a flow. Non-verifiable items (briefings, visual
+  checks) still take a Space/click, then the flow continues.
+- Auto-checked items get an amber corner badge so you can tell sim-confirmed
+  steps from manually acknowledged ones.
+- Conditions live in the aircraft JSON as simple `"verify"` expressions, e.g.
+  `"ELECTRICAL_MASTER_BATTERY == 1"` or ranges like
+  `["GENERAL_ENG_RPM:1 >= 1650", "GENERAL_ENG_RPM:1 <= 1950"]` — add your own
+  for new aircraft using SimVar names from the MSFS SDK.
+
+Requires the base package's `SimConnect` dependency (installed with
+`pip install -e .`) and MSFS loaded into a flight; it degrades to a grey
+"○ SIM" chip anywhere else.
+
 ## Using it with MSFS 2024
 
 1. Run MSFS in **borderless windowed mode** (General Options → Graphics →
