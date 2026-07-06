@@ -30,6 +30,7 @@ RECORDER_VARS = [
 ]
 
 SAMPLE_INTERVAL_S = 1.0
+MAX_SAMPLES = 7200  # ~2 h at 1 Hz; past this the trail decimates (see _decimate_if_full)
 
 
 def parse_limits(vspeeds: list[tuple[str, str]]) -> dict[str, float]:
@@ -78,6 +79,7 @@ class FlightRecorder:
 
     _prev: dict = field(default_factory=dict)
     _last_sample_t: float | None = None
+    _sample_interval: float = SAMPLE_INTERVAL_S  # grows as the trail decimates
     saved: bool = False  # set once persisted, so we don't double-save on close
 
     # ------------------------------------------------------------- config
@@ -164,8 +166,8 @@ class FlightRecorder:
                 entry["seconds"] = round(entry["seconds"] + dt, 1)
                 entry["max_ias"] = max(entry["max_ias"], round(ias, 1))
 
-        # 1 Hz sample trail
-        if self._last_sample_t is None or now - self._last_sample_t >= SAMPLE_INTERVAL_S:
+        # sample trail (1 Hz, coarsening after MAX_SAMPLES to bound memory)
+        if self._last_sample_t is None or now - self._last_sample_t >= self._sample_interval:
             self._last_sample_t = now
             self.samples.append({
                 "t": self._t(now),
@@ -178,12 +180,20 @@ class FlightRecorder:
                 "mixture": round(_num(values, "GENERAL_ENG_MIXTURE_LEVER_POSITION:1") or 0),
                 "on_ground": bool(on_ground) if on_ground is not None else None,
             })
+            self._decimate_if_full()
 
         self._prev = {
             "on_ground": on_ground if on_ground is not None else prev.get("on_ground"),
             "combustion": combustion if combustion is not None else prev.get("combustion"),
             "alt": alt, "now": now, "fpm": fpm if fpm is not None else prev.get("fpm"),
         }
+
+    def _decimate_if_full(self) -> None:
+        """Halve the sample resolution when the trail gets long, so a marathon
+        flight uses bounded memory (keeps the whole flight, coarser over time)."""
+        if len(self.samples) > MAX_SAMPLES:
+            self.samples = self.samples[::2]
+            self._sample_interval *= 2  # future samples come in at the coarser rate
 
     # ------------------------------------------------------------ summary
     @property

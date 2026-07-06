@@ -107,6 +107,19 @@ def test_trace_is_downsampled_and_capped():
     assert len(rec.summary()["trace"]) <= 100
 
 
+def test_samples_stay_bounded_over_a_marathon_flight():
+    from checklist_app.flight_log import MAX_SAMPLES
+
+    rec = c172_recorder()
+    # 20,000 seconds (>5 h) at 1 Hz would be 20k samples uncapped.
+    for i in range(20_000):
+        rec.update(sample(0, 100, 3000), now=float(i))
+    assert len(rec.samples) <= MAX_SAMPLES  # decimated, not unbounded
+    # still spans the whole flight
+    assert rec.samples[0]["t"] == 0.0
+    assert rec.samples[-1]["t"] >= 19_000
+
+
 def test_save_roundtrip(tmp_path):
     rec = c172_recorder()
     rec.update(sample(1, 0, 1000), now=0.0)

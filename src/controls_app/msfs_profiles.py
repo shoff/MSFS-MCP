@@ -63,11 +63,17 @@ def candidate_roots() -> list[tuple[str, Path]]:
     return roots
 
 
+MAX_PROFILE_BYTES = 2_000_000
+_HEAD_BYTES = 4096
+
+
 def _looks_like_profile(path: Path) -> bool:
     try:
-        if path.stat().st_size > 2_000_000:
+        st = path.stat()
+        if st.st_size > MAX_PROFILE_BYTES or st.st_size == 0:
             return False
-        head = path.read_bytes()[:4096].decode("utf-8", errors="ignore")
+        with path.open("rb") as f:            # read only the head, not the whole file
+            head = f.read(_HEAD_BYTES).decode("utf-8", errors="ignore")
     except OSError:
         return False
     return "<Device" in head and ("FriendlyName" in head or "ContextName" in head)
@@ -82,7 +88,12 @@ class InputProfile:
 
 
 def find_profiles(extra_roots: list[Path] | None = None) -> list[InputProfile]:
-    """Scan the known locations (plus any extra folders) for input profiles."""
+    """Scan the known locations (plus any extra folders) for input profiles.
+
+    Streams the directory walk (never materializes the whole tree), reads only
+    each candidate's 4 KB head, and skips oversized/empty files by stat before
+    opening — so it stays cheap even over a large MS Store WGS container.
+    """
     profiles: list[InputProfile] = []
     scan: list[tuple[str, Path]] = list(candidate_roots())
     for root in extra_roots or []:
@@ -90,13 +101,12 @@ def find_profiles(extra_roots: list[Path] | None = None) -> list[InputProfile]:
     for source, root in scan:
         if not root.is_dir():
             continue
-        candidates = [p for p in root.rglob("*") if p.is_file()]
-        for path in candidates:
+        for path in root.rglob("*"):
             name = path.name.lower()
             if not (name.startswith("inputprofile") or "wgs" in str(path).lower()
                     or source == "custom folder"):
                 continue
-            if not _looks_like_profile(path):
+            if not path.is_file() or not _looks_like_profile(path):
                 continue
             try:
                 parsed = parse_profile(path)

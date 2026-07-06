@@ -48,9 +48,18 @@ def is_server_running(host: str = DEFAULT_HOST, port: int | None = None, timeout
         return False
 
 
+MAX_LOG_BYTES = 5_000_000  # truncate the server log past this on each spawn
+
+
 def _spawn_detached(host: str, port: int) -> None:
     """Launch the server as its own process that survives the GUI closing."""
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Don't let the log grow without bound across months of sessions.
+    try:
+        if LOG_PATH.exists() and LOG_PATH.stat().st_size > MAX_LOG_BYTES:
+            LOG_PATH.unlink()
+    except OSError:
+        pass
     log_file = open(LOG_PATH, "ab")
     cmd = [
         sys.executable, "-m", "msfs_mcp.server",
@@ -68,7 +77,10 @@ def _spawn_detached(host: str, port: int) -> None:
         )
     else:
         kwargs["start_new_session"] = True
-    subprocess.Popen(cmd, **kwargs)
+    try:
+        subprocess.Popen(cmd, **kwargs)
+    finally:
+        log_file.close()  # child has its own dup'd fd; don't leak ours
 
 
 def ensure_server_running(

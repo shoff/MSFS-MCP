@@ -141,6 +141,23 @@ class AdvisorWorker(QThread):
             self.failed.emit(f"Advisor error: {exc}")
 
 
+class ProfileScanWorker(QThread):
+    """Scan for MSFS profiles off the GUI thread (the walk can hit thousands
+    of files on a large MS Store install and would otherwise freeze the UI)."""
+
+    scanned = pyqtSignal(list)
+
+    def __init__(self, extra):
+        super().__init__()
+        self.extra = extra
+
+    def run(self):
+        try:
+            self.scanned.emit(msfs_profiles.find_profiles(self.extra))
+        except Exception:
+            self.scanned.emit([])
+
+
 def _aircraft_context(aircraft_key: str) -> str:
     """Pull reference data (V-speeds, checklist phases) from the checklist app."""
     try:
@@ -239,24 +256,50 @@ class WriteDialog(QDialog):
         self.write_btn.setEnabled(bool(self.resolved.actions))
 
     def _scan(self, extra: list | None = None) -> None:
-        self.profiles = msfs_profiles.find_profiles(extra)
+        # A new scan supersedes any in-flight one (e.g. the __init__ system
+        # scan when the user immediately hits Browse). We don't drop the new
+        # request; we tag it with a generation and ignore stale results.
+        self._scan_gen = getattr(self, "_scan_gen", 0) + 1
+        gen = self._scan_gen
         self.profile_list.clear()
-        if not self.profiles:
+        self.profile_list.addItem("Scanning for MSFS profiles…")
+        worker = ProfileScanWorker(extra)
+        worker.setParent(self)
+        worker.scanned.connect(lambda profiles, g=gen: self._on_scanned(profiles, g))
+        # keep prior workers alive until they finish (QThread must not be
+        # destroyed while running), but prune the ones that already have.
+        self._workers = [w for w in getattr(self, "_workers", []) if w.isRunning()]
+        self._workers.append(worker)
+        self._scan_worker = worker
+        worker.start()
+
+    def _on_scanned(self, profiles: list, gen: int = 0) -> None:
+        if gen != getattr(self, "_scan_gen", 0):
+            return  # a newer scan superseded this one
+        self.profiles = profiles
+        self.profile_list.clear()
+        if not profiles:
             self.profile_list.addItem(
                 "No MSFS input profiles found — is MSFS installed on this machine? Use Browse…"
             )
             return
-        for prof in self.profiles:
+        for prof in profiles:
             devices = ", ".join(prof.device_names)
             item = QListWidgetItem(f"{prof.friendly_name}   [{prof.source}]   ({devices})")
             item.setData(Qt.ItemDataRole.UserRole, prof)
             self.profile_list.addItem(item)
         # preselect a profile containing this device
         fragment = MSFS_DEVICE_FRAGMENTS.get(self.device_id, "").lower()
-        for i, prof in enumerate(self.profiles):
+        for i, prof in enumerate(profiles):
             if any(fragment in d.lower() for d in prof.device_names):
                 self.profile_list.setCurrentRow(i)
                 break
+
+    def done(self, result: int) -> None:  # noqa: N802 — wait out the scan threads
+        for worker in getattr(self, "_workers", []):
+            if worker.isRunning():
+                worker.wait(3000)
+        super().done(result)
 
     def _browse(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Folder containing MSFS input profiles")
