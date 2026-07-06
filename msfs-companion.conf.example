@@ -1,0 +1,26 @@
+# MSFS 2024 Companion — LLM configuration
+# --------------------------------------------------------------------------
+# Copy this file to  msfs-companion.conf  (same folder) and edit the values.
+# Both apps read it at startup, so you don't need Windows environment vars.
+#
+# Lines starting with # or ; are comments. Quotes around values are optional.
+# A real OS environment variable, if set, overrides the matching line here.
+# --------------------------------------------------------------------------
+
+# Which LLM backend to use:  anthropic | openai | local
+#   anthropic = Claude          (needs anthropic_api_key)
+#   openai    = OpenAI          (needs openai_api_key)
+#   local     = Ollama / LM Studio / llama.cpp — runs offline, no key
+provider = openai
+
+# Optional: pin a specific model. Leave commented for the provider default
+# (anthropic -> claude-opus-4-8, openai -> gpt-4o, local -> llama3.1).
+# model = gpt-4o
+
+# Your API keys. Only the one for the chosen provider is needed.
+openai_api_key = sk-REPLACE_ME
+# anthropic_api_key = sk-ant-REPLACE_ME
+
+# Optional: endpoint for the openai/local providers (OpenAI-compatible servers).
+# The local default is http://localhost:11434/v1 (Ollama).
+# base_url = http://localhost:11434/v1

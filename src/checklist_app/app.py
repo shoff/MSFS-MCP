@@ -714,6 +714,9 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
+    from companion_common import config
+
+    config.apply()  # load LLM settings from msfs-companion.conf if present
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setStyleSheet(theme.QSS)

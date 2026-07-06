@@ -106,18 +106,33 @@ source (the model that produced it).
 
 ### Choosing an LLM provider
 
-Set `MSFS_COMPANION_LLM` (this applies to the flight debrief too):
+Pick a backend (this applies to the flight debrief too):
 
-| `MSFS_COMPANION_LLM` | Backend | Needs | Default model |
+| Provider | Backend | Needs | Default model |
 |---|---|---|---|
-| `anthropic` (default) | Claude | `ANTHROPIC_API_KEY` | `claude-opus-4-8` |
-| `openai` | OpenAI or any hosted OpenAI-compatible API | `OPENAI_API_KEY` | `gpt-4o` |
+| `anthropic` (default) | Claude | Anthropic API key | `claude-opus-4-8` |
+| `openai` | OpenAI or any hosted OpenAI-compatible API | OpenAI API key | `gpt-4o` |
 | `local` (aliases: `ollama`, `llama`) | A local OpenAI-compatible server — Ollama, LM Studio, llama.cpp, vLLM | nothing (runs offline) | `llama3.1` |
 
-- `MSFS_COMPANION_MODEL` overrides the model for any provider.
-- `MSFS_COMPANION_LLM_BASE_URL` overrides the endpoint (local default
-  `http://localhost:11434/v1`, Ollama's OpenAI-compatible port).
-- `openai`/`local` need the `openai` package: `pip install -e ".[controls,openai]"`.
+**Easiest: a config file.** Copy `msfs-companion.conf.example` to
+`msfs-companion.conf` (the `.cmd` launchers do this for you on first run) and
+edit it — no environment variables needed:
+
+```ini
+provider = openai
+# model = gpt-4o
+openai_api_key = sk-...
+# base_url = http://localhost:11434/v1   # for local/OpenAI-compatible servers
+```
+
+The file is searched for at `$MSFS_COMPANION_CONFIG`, then `./msfs-companion.conf`,
+then `~/.msfs_companion/config.conf`.
+
+**Or use environment variables** (these override the file, useful for a one-off
+session): `MSFS_COMPANION_LLM`, `MSFS_COMPANION_MODEL`,
+`MSFS_COMPANION_LLM_BASE_URL`, and the provider's API key.
+
+`openai`/`local` need the `openai` package: `pip install -e ".[controls,openai]"`.
 
 Example — run fully offline with a local Llama via Ollama:
 

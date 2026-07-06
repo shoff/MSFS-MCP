@@ -8,15 +8,13 @@ REM ============================================================================
 setlocal
 cd /d "%~dp0"
 
-REM ---------------------------------------------------------------- LLM provider
-REM Use OpenAI for the instructor debrief (Post-flight -> Debrief).
-set "MSFS_COMPANION_LLM=openai"
-REM Optional: pick a specific model (default is gpt-4o).
-REM set "MSFS_COMPANION_MODEL=gpt-4o"
-
-REM Provide your OpenAI key. If it's already set in your Windows environment
-REM this keeps it; otherwise it asks once (not stored to disk).
-if "%OPENAI_API_KEY%"=="" set /p "OPENAI_API_KEY=Enter your OpenAI API key (or press Enter to skip): "
+REM ---------------------------------------------------------------- LLM config
+REM The AI provider, model, and API key are read from msfs-companion.conf.
+REM On first run we create it from the example so you can edit it.
+if not exist "msfs-companion.conf" (
+    echo Creating msfs-companion.conf - edit it to set your AI provider and key.
+    copy /y "msfs-companion.conf.example" "msfs-companion.conf" >nul
+)
 
 REM ------------------------------------------------------- 1) ensure a .venv
 if not exist ".venv\Scripts\python.exe" (
