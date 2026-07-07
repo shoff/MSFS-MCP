@@ -54,6 +54,8 @@ class InputMonitor(QObject):
         self._sticks: dict[str, object] = {}     # device_id -> pygame joystick
         self._state: dict[str, dict] = {}        # device_id -> {buttons: [], axes: [], hats: []}
         self._manual: dict[str, str] = _load_assignments()  # device_id -> joystick name
+        self._hid: dict[str, object] = {}        # device_id -> HidAxisDevice (SDL-missed gear)
+        self._hid_axes: dict[str, list] = {}     # device_id -> last axis values
         self.available = False
         self._timer = QTimer(self)
         self._timer.setInterval(POLL_MS)
@@ -78,6 +80,9 @@ class InputMonitor(QObject):
 
     def stop(self) -> None:
         self._timer.stop()
+        for dev in list(self._hid.values()):
+            dev.close()
+        self._hid.clear()
         if self._pygame:
             try:
                 self._pygame.joystick.quit()
@@ -134,8 +139,38 @@ class InputMonitor(QObject):
                     self._bind(device.id, stick)
                     used.add(i)
                     break
-        detected = {d.id: (d.always_present or d.id in self._sticks) for d in DEVICES}
+        # 3) HID fallback: bindable devices SDL couldn't enumerate (e.g. rudder
+        #    pedals with a Simulation-Controls usage page) — read them off the
+        #    raw USB bus directly so they still work.
+        self._open_hid_fallback()
+
+        detected = {d.id: (d.always_present or d.id in self._sticks or d.id in self._hid)
+                    for d in DEVICES}
         self.devices_changed.emit(detected)
+
+    def _open_hid_fallback(self) -> None:
+        for dev in list(self._hid.values()):
+            dev.close()
+        self._hid.clear()
+        self._hid_axes.clear()
+        try:
+            from . import hid_input
+            if not hid_input.available():
+                return
+            for device in DEVICES:
+                if device.always_present or device.id in self._sticks:
+                    continue  # SDL already handles it
+                if not device.usb_ids and not device.match_names:
+                    continue
+                match = hid_input.find_for_device(device.usb_ids, device.match_names)
+                if match is None:
+                    continue
+                hid_dev = hid_input.HidAxisDevice(match["path"])
+                if hid_dev.ok:
+                    self._hid[device.id] = hid_dev
+                    self._hid_axes[device.id] = []
+        except Exception:
+            pass
 
     def assign(self, device_id: str, joystick_name: str | None) -> None:
         """Force a physical joystick (by its SDL name) to drive a device slot,
@@ -149,15 +184,18 @@ class InputMonitor(QObject):
 
     def caps(self, device_id: str) -> tuple[int, int, int]:
         """(axes, buttons, hats) the connected device actually reports, read
-        straight from SDL — so the UI can draw the real control count, not a
+        straight from the device — so the UI draws the real control count, not a
         hardcoded guess. (0, 0, 0) if the device isn't currently bound."""
         stick = self._sticks.get(device_id)
-        if stick is None:
-            return (0, 0, 0)
-        try:
-            return (stick.get_numaxes(), stick.get_numbuttons(), stick.get_numhats())
-        except Exception:
-            return (0, 0, 0)
+        if stick is not None:
+            try:
+                return (stick.get_numaxes(), stick.get_numbuttons(), stick.get_numhats())
+            except Exception:
+                return (0, 0, 0)
+        hid_dev = self._hid.get(device_id)
+        if hid_dev is not None:
+            return (len(self._hid_axes.get(device_id) or hid_dev.axes), 0, 0)
+        return (0, 0, 0)
 
     def raw_snapshot(self) -> list[dict]:
         """Live state of EVERY connected joystick, matched or not — the data the
@@ -197,10 +235,21 @@ class InputMonitor(QObject):
                 })
             except Exception:
                 continue
+        # HID-fallback devices (SDL couldn't see them) appear here too, so the
+        # diagnostics view shows the rudder as a real, live, matched device.
+        for device_id, _hid_dev in self._hid.items():
+            axes = self._hid_axes.get(device_id, [])
+            out.append({
+                "index": f"USB-HID", "name": f"{device_id} (read via raw USB)",
+                "guid": None, "vid": None, "pid": None, "matched": device_id,
+                "axes": [round(v, 2) for v in axes],
+                "buttons": [], "num_buttons": 0, "hats": [],
+            })
         return out
 
     # ------------------------------------------------------------------
     def _poll(self) -> None:
+        self._poll_hid()
         if not self._pygame:
             return
         try:
@@ -224,3 +273,14 @@ class InputMonitor(QObject):
                 if hat != state["hats"][i]:
                     state["hats"][i] = hat
                     self.hat_changed.emit(device_id, i, hat[0], hat[1])
+
+    def _poll_hid(self) -> None:
+        """Read HID-fallback devices (SDL couldn't see) and emit axis changes."""
+        for device_id, hid_dev in self._hid.items():
+            axes = hid_dev.poll()
+            prev = self._hid_axes.get(device_id, [])
+            for i, v in enumerate(axes):
+                old = prev[i] if i < len(prev) else 999.0
+                if abs(v - old) > AXIS_EPSILON:
+                    self.axis_changed.emit(device_id, i, v)
+            self._hid_axes[device_id] = list(axes)
