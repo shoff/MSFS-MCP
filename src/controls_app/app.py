@@ -558,6 +558,7 @@ class MainWindow(QMainWindow):
         self.monitor.hat_changed.connect(self._on_hat)
         self.monitor.devices_changed.connect(self._on_devices_changed)
         self.monitor.start()
+        self._update_input_banner()  # tell the user immediately if we see no hardware
         QApplication.instance().installEventFilter(self)
 
         # make sure the shared MCP server is up (detached; survives app close)
@@ -643,6 +644,13 @@ class MainWindow(QMainWindow):
         )
         lay.addWidget(self.flow)
         self._update_flow(2)
+
+        # Unmissable banner when we can't see the user's hardware (the silent
+        # "I move controls and nothing happens" case).
+        self.input_banner = QLabel()
+        self.input_banner.setWordWrap(True)
+        self.input_banner.hide()
+        lay.addWidget(self.input_banner)
 
         title_row = QHBoxLayout()
         self.device_title = QLabel(objectName="SectionTitle")
@@ -804,9 +812,43 @@ class MainWindow(QMainWindow):
         )
 
     # ---------------------------------------------------------- live input
+    def _update_input_banner(self) -> None:
+        bindable = ("honeycomb_alpha", "honeycomb_bravo", "velocityone_rudder")
+        if not getattr(self.monitor, "available", False):
+            msg = ("⚠ This PC can’t read game controllers (the input library failed to load). "
+                   "Reinstall with  pip install pygame  and reopen the app.")
+            color = theme.RED
+        elif not any(self.detected.get(d) for d in bindable):
+            msg = ("⚠ No flight controllers detected. Plug in your Honeycomb / pedals and click "
+                   "⟳ Rescan — or open 🔎 Hardware to see exactly what the app sees and assign a "
+                   "device that isn’t recognized automatically.")
+            color = theme.AMBER
+        else:
+            self.input_banner.hide()
+            return
+        self.input_banner.setText(msg)
+        self.input_banner.setStyleSheet(
+            f"background: {theme.PANEL}; border: 1px solid {color}; border-radius: 6px; "
+            f"padding: 6px 10px; color: {color}; font-size: 12px;"
+        )
+        self.input_banner.show()
+
+    def _focus_device(self, device_id: str) -> None:
+        """Bring the device the user is operating into view, so moving a control
+        always shows something even if a different device was selected."""
+        if device_id == "keyboard_mouse" or self.learn_btn.isChecked():
+            return
+        if self._current_device_id() == device_id:
+            return
+        for i in range(self.sidebar.count()):
+            if self.sidebar.item(i).data(Qt.ItemDataRole.UserRole) == device_id:
+                self.sidebar.setCurrentRow(i)
+                break
+
     def _on_devices_changed(self, detected: dict) -> None:
         self.detected = detected
         self._populate_sidebar()
+        self._update_input_banner()
 
     def _view_and_map(self, device_id: str) -> tuple[DeviceView, InputMap]:
         return self.views[device_id], self.maps[device_id]
@@ -846,6 +888,8 @@ class MainWindow(QMainWindow):
     def _on_button(self, device_id: str, index: int, pressed: bool) -> None:
         view, imap = self._view_and_map(device_id)
         self.raw_input.setText(f"{device_id}: button {index} {'▼' if pressed else '▲'}")
+        if pressed:
+            self._focus_device(device_id)
         learn = getattr(self, "_learn", None)
         if pressed and view.learn_mode and learn and not learn["is_axis"]:
             if index in learn["buffer"]:
@@ -870,6 +914,8 @@ class MainWindow(QMainWindow):
     def _on_axis(self, device_id: str, index: int, value: float) -> None:
         view, imap = self._view_and_map(device_id)
         self.raw_input.setText(f"{device_id}: axis {index} = {value:+.2f}")
+        if abs(value) > 0.5:
+            self._focus_device(device_id)
         learn = getattr(self, "_learn", None)
         if view.learn_mode and learn and learn["is_axis"] and abs(value) > 0.75:
             imap.learn_axis(index, learn["control"])
