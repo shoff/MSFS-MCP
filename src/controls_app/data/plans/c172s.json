@@ -44,7 +44,7 @@
         "priority": "recommended"
       },
       {
-        "control": "2-way rocker (right grip)",
+        "control": "Right rocker — top (2-way)",
         "assignment": "Elevator trim up/down (backup)",
         "msfs_setting": "ELEVATOR TRIM UP / DOWN",
         "usage_tip": "Fine trim while your right hand is on the throttle; big trim changes go to the Bravo wheel.",

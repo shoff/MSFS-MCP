@@ -1084,11 +1084,17 @@ class MainWindow(QMainWindow):
         kind = self._control_kind(device_id, control_id)
         spec = self._spec_for_control(device_id, control_id)
         if kind in ("axis", "lever"):
-            self._learn = {"control": control_id, "is_axis": True, "labels": ["move it fully"], "buffer": []}
-            prompt = "move the physical axis fully"
+            self._learn = {"control": control_id, "is_axis": True, "is_hat": False,
+                           "labels": ["move it fully"], "buffer": [], "axis_range": {}}
+            prompt = "sweep ONLY this axis through its full travel"
+        elif kind == "hat":
+            self._learn = {"control": control_id, "is_axis": False, "is_hat": True,
+                           "labels": ["move the hat"], "buffer": []}
+            prompt = "push the hat in any direction"
         else:
             labels = list(spec.slots) if (spec and spec.kind == "button" and len(spec.slots) > 1) else ["press it"]
-            self._learn = {"control": control_id, "is_axis": False, "labels": labels, "buffer": []}
+            self._learn = {"control": control_id, "is_axis": False, "is_hat": False,
+                           "labels": labels, "buffer": []}
             prompt = labels[0]
         self.status.setText(f"Learn '{control_id}': {prompt}…")
 
@@ -1177,7 +1183,7 @@ class MainWindow(QMainWindow):
         if pressed:
             self._focus_device(device_id)
         learn = getattr(self, "_learn", None)
-        if pressed and view.learn_mode and learn and not learn["is_axis"]:
+        if pressed and view.learn_mode and learn and not learn["is_axis"] and not learn.get("is_hat"):
             if index in learn["buffer"]:
                 return  # ignore a repeat of an already-captured slot
             learn["buffer"].append(index)
@@ -1206,23 +1212,41 @@ class MainWindow(QMainWindow):
         if abs(value) > 0.5:
             self._focus_device(device_id)
         learn = getattr(self, "_learn", None)
-        if view.learn_mode and learn and learn["is_axis"] and abs(value) > 0.75:
-            imap.learn_axis(index, learn["control"])
-            save_maps(self.maps)
-            self.status.setText(f"Learned {learn['control']} → axis {index} (saved)")
-            self._learn = None
-            self._after_capture()
+        if view.learn_mode and learn and learn.get("is_axis"):
+            # Capture the axis the user SWEEPS through a wide range — not just any
+            # axis that reads high. An uncentered axis sitting at an extreme, or a
+            # small cross-coupling nudge on pitch while you roll, barely moves, so
+            # it can't be grabbed by mistake (fixes "rolling jumps to pitch").
+            rng = learn["axis_range"].setdefault(index, [value, value])
+            rng[0] = min(rng[0], value)
+            rng[1] = max(rng[1], value)
+            if rng[1] - rng[0] > 0.8:
+                imap.learn_axis(index, learn["control"])
+                save_maps(self.maps)
+                self.status.setText(f"Learned {learn['control']} → axis {index} (saved)")
+                self._learn = None
+                self._after_capture()
         control = imap.control_for_axis(index)
         if control:
             view.set_value(control, value)
 
     def _on_hat(self, device_id: str, index: int, x: int, y: int) -> None:
         view, imap = self._view_and_map(device_id)
-        if x or y:
-            self.raw_input.setText(f"{device_id}: hat {index} = ({x},{y})")
-            control = imap.hats.get(index)
-            if control:
-                view.pulse(control)
+        if not (x or y):
+            return
+        self.raw_input.setText(f"{device_id}: hat {index} = ({x},{y})")
+        learn = getattr(self, "_learn", None)
+        if view.learn_mode and learn and learn.get("is_hat"):
+            imap.learn_hat(index, learn["control"])
+            save_maps(self.maps)
+            self.status.setText(f"Learned {learn['control']} → hat {index} (saved)")
+            view.pulse(learn["control"])
+            self._learn = None
+            self._after_capture()
+            return
+        control = imap.hats.get(index)
+        if control:
+            view.pulse(control)
 
     def _on_element_clicked(self, control_id: str) -> None:
         view = self.view_stack.currentWidget()

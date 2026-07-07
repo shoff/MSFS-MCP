@@ -53,11 +53,13 @@ DEFAULT_MAPS: dict[str, dict] = {
         "axes": {"0": "aileron", "1": "elevator"},
         "buttons": {
             "left_white": [0],
-            "left_rocker": [1, 2],
-            "left_trigger": [3],
-            "right_red": [4],
-            "right_white": [5],
-            "right_rocker": [6, 7],
+            "left_rocker_l": [1, 2],
+            "left_rocker_r": [3, 4],
+            "left_trigger": [5],
+            "right_rocker_top": [6, 7],
+            "right_rocker_bot": [8, 9],
+            "right_white": [10],
+            "right_red": [11],
             "sw_alt": [13, 14],
             "sw_bat": [15, 16],
             "sw_avionics1": [17, 18],
@@ -161,6 +163,14 @@ class InputMap:
         # An axis maps to exactly one control; drop stale entries for it.
         self.axes = {i: c for i, c in self.axes.items() if c != control_id}
         self.axes[index] = control_id
+
+    def learn_hat(self, index: int, control_id: str) -> None:
+        # A hat maps to exactly one control; drop stale entries for it.
+        self.hats = {i: c for i, c in self.hats.items() if c != control_id}
+        self.hats[index] = control_id
+
+    def control_for_hat(self, index: int) -> str | None:
+        return self.hats.get(index)
 
     def to_dict(self) -> dict:
         return {

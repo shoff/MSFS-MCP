@@ -240,15 +240,17 @@ def _alpha() -> tuple[list[Element], list[Decor]]:
     elements = [
         Element("elevator", "PITCH", "gauge_v", (46, 90, 22, 180)),
         Element("aileron", "ROLL", "gauge_h", (392, 34, 216, 20)),
-        # LEFT grip: hat + white button + 2-way rocker (two buttons) + trigger
-        Element("hat", "HAT", "hat", (150, 104, 50, 50)),
-        Element("left_white", "WHT", "round", (224, 108, 30, 30)),
-        Element("left_rocker", "ROCK", "switch", (150, 162, 30, 46)),
-        Element("left_trigger", "TRIG", "round", (224, 170, 30, 30)),
-        # RIGHT grip: 2-way rocker (two buttons) + white button + red button
-        Element("right_rocker", "ROCK", "switch", (700, 162, 30, 46)),
-        Element("right_white", "WHT", "round", (774, 108, 30, 30)),
-        Element("right_red", "RED", "round", (774, 170, 30, 30)),
+        # LEFT grip: hat + white + TWO side-by-side rockers + trigger
+        Element("hat", "HAT", "hat", (140, 100, 48, 48)),
+        Element("left_white", "WHT", "round", (256, 104, 28, 28)),
+        Element("left_rocker_l", "RK1", "switch", (150, 158, 24, 46)),
+        Element("left_rocker_r", "RK2", "switch", (182, 158, 24, 46)),
+        Element("left_trigger", "TRIG", "round", (256, 162, 28, 28)),
+        # RIGHT grip: TWO stacked rockers + white + red
+        Element("right_rocker_top", "RK1", "switch", (700, 100, 24, 42)),
+        Element("right_rocker_bot", "RK2", "switch", (700, 150, 24, 42)),
+        Element("right_white", "WHT", "round", (766, 104, 28, 28)),
+        Element("right_red", "RED", "round", (766, 160, 28, 28)),
         Element("sw_bat", "BAT", "switch", (172, 322, 34, 52)),
         Element("sw_alt", "ALT", "switch", (238, 322, 34, 52)),
         Element("sw_avionics1", "AVI 1", "switch", (304, 322, 34, 52)),
