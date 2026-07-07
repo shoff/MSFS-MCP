@@ -27,6 +27,33 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass, field
+
+@dataclass
+class LLMExchange:
+    """One request/response with the model — recorded so the UI can show EXACTLY
+    what was sent and received (this integration uses a single structured-output
+    call, not multi-step tool calls)."""
+
+    provider: str
+    model: str
+    system: str
+    user: str
+    schema: dict = field(default_factory=dict)
+    response: str = ""
+    ok: bool = True
+    error: str = ""
+
+
+HISTORY: list[LLMExchange] = []
+MAX_HISTORY = 40
+
+
+def _record(ex: LLMExchange) -> LLMExchange:
+    HISTORY.append(ex)
+    del HISTORY[:-MAX_HISTORY]
+    return ex
+
 
 DEFAULT_MODELS = {
     "anthropic": "claude-opus-4-8",
@@ -84,6 +111,29 @@ def no_credentials_msg(fallback_note: str = "") -> str:
     return (base + (" " + fallback_note if fallback_note else "")).strip()
 
 
+# Live observers of AI activity (the AI Activity tab registers one). Called from
+# the worker thread on request-start and on completion; keep them cheap/thread-safe.
+_LISTENERS: list = []
+
+
+def add_listener(fn) -> None:
+    if fn not in _LISTENERS:
+        _LISTENERS.append(fn)
+
+
+def remove_listener(fn) -> None:
+    if fn in _LISTENERS:
+        _LISTENERS.remove(fn)
+
+
+def _notify(ex: LLMExchange) -> None:
+    for fn in list(_LISTENERS):
+        try:
+            fn(ex)
+        except Exception:
+            pass
+
+
 def call_json(
     *,
     system: str,
@@ -98,13 +148,27 @@ def call_json(
 
     Run from a worker thread — it blocks on the network. Dispatches to the
     configured provider. Every failure mode is raised as ``error_cls``.
-    ``fallback_note`` is appended to the provider-specific no-credentials
-    message so each app can say what still works without the LLM.
+    Records the exchange to HISTORY and notifies live listeners on start and
+    completion, so the UI can show exactly what was sent and received.
     """
     creds_msg = no_credentials_msg(fallback_note)
-    if provider() == "anthropic":
-        return _call_anthropic(system, user, schema, error_cls, creds_msg, refusal_msg, max_tokens)
-    return _call_openai_compatible(system, user, schema, error_cls, creds_msg, refusal_msg, max_tokens)
+    ex = _record(LLMExchange(provider=provider(), model=model(), system=system,
+                             user=user, schema=schema, response="⏳ waiting for the model…"))
+    _notify(ex)  # request is visible immediately (live)
+    try:
+        if provider() == "anthropic":
+            result, raw = _call_anthropic(system, user, schema, error_cls, creds_msg, refusal_msg, max_tokens)
+        else:
+            result, raw = _call_openai_compatible(system, user, schema, error_cls, creds_msg, refusal_msg, max_tokens)
+    except Exception as exc:
+        ex.ok = False
+        ex.error = str(exc)
+        ex.response = ""
+        _notify(ex)
+        raise
+    ex.response = raw
+    _notify(ex)
+    return result
 
 
 # --------------------------------------------------------------- Anthropic
@@ -137,7 +201,7 @@ def _call_anthropic(system, user, schema, error_cls, no_credentials_msg, refusal
     if response.stop_reason == "refusal":
         raise error_cls(refusal_msg)
     text = next(block.text for block in response.content if block.type == "text")
-    return json.loads(text)
+    return json.loads(text), text
 
 
 # ------------------------------------------- OpenAI / local (OpenAI-compatible)
@@ -200,7 +264,7 @@ def _call_openai_compatible(system, user, schema, error_cls, no_credentials_msg,
     content = choice.message.content
     if not content:
         raise error_cls("The model returned an empty response.")
-    return _extract_json(content, error_cls)
+    return _extract_json(content, error_cls), content
 
 
 def _create_with_token_fallback(client, openai, base_kwargs, max_tokens, prefer):

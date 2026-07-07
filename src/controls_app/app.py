@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QTableWidget,
+    QTabWidget,
     QTableWidgetItem,
     QTextBrowser,
     QToolButton,
@@ -521,6 +522,8 @@ class DiagnosticsDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
+    ai_activity_updated = pyqtSignal(object)  # emitted (cross-thread) per LLM event
+
     def __init__(self, plans: dict[str, ControlPlan], detected: dict[str, bool]):
         super().__init__()
         self.plans = plans
@@ -596,6 +599,12 @@ class MainWindow(QMainWindow):
         self.mcp_worker = McpAutostartWorker(self)
         self.mcp_worker.result.connect(self._on_mcp_autostart)
         self.mcp_worker.start()
+
+        # Live AI Activity feed: llm.call_json notifies from the worker thread;
+        # marshal to the GUI thread via a queued signal.
+        self.ai_activity_updated.connect(self._render_ai_activity)
+        self._ai_listener = self.ai_activity_updated.emit
+        llm.add_listener(self._ai_listener)
 
         # Build the AI setup automatically once the window is up (deferred so the
         # UI paints first and the progress feedback is visible).
@@ -777,9 +786,15 @@ class MainWindow(QMainWindow):
 
         self.guidance = QTextBrowser()
         self.guidance.setOpenExternalLinks(True)
-        splitter.addWidget(self.guidance)
+        self.ai_activity = QTextBrowser()
+        self.ai_activity.setOpenExternalLinks(False)
+        self.bottom_tabs = QTabWidget()
+        self.bottom_tabs.addTab(self.guidance, "📋 Guide")
+        self.bottom_tabs.addTab(self.ai_activity, "🤖 AI Activity")
+        splitter.addWidget(self.bottom_tabs)
         splitter.setSizes([300, 330, 190])
         lay.addWidget(splitter, 1)
+        self._render_ai_activity()
         return pane
 
     # -------------------------------------------------------------- footer
@@ -875,6 +890,56 @@ class MainWindow(QMainWindow):
             f"<p><b>Setup &amp; flying guide</b></p><ol>{steps}</ol>"
             f"<p>{legend} &nbsp;·&nbsp; <span style='color:{theme.TEXT_FAINT}'>plan source: {p.source}</span></p>"
         )
+
+    # ---------------------------------------------------------- AI activity
+    def _render_ai_activity(self, _ex=None) -> None:
+        import html
+        import json
+
+        from companion_common import llm
+
+        if not llm.HISTORY:
+            self.ai_activity.setHtml(
+                f"<p style='color:{theme.TEXT_DIM}'>No AI calls yet. When the app builds a setup "
+                "(automatically or via ✦ AI Setup) the full request and response stream here —"
+                " the exact system prompt, what the app sent about your aircraft and hardware, "
+                "the JSON schema the model must fill, and its reply.</p>"
+            )
+            return
+        blocks = [
+            f"<p style='color:{theme.TEXT_DIM}'>{len(llm.HISTORY)} call(s) this session · newest first. "
+            "This integration makes one structured-output request per build (no multi-step tool calls).</p>"
+        ]
+
+        def pre(text):
+            return (f"<pre style='white-space:pre-wrap; background:{theme.PANEL_ALT}; "
+                    f"border:1px solid {theme.BORDER}; border-radius:6px; padding:8px; "
+                    f"color:{theme.TEXT}'>{html.escape(text or '')}</pre>")
+
+        for ex in reversed(llm.HISTORY):
+            if not ex.ok:
+                badge = f"<span style='color:{theme.RED}'>✗ error</span>"
+            elif ex.response.startswith("⏳"):
+                badge = f"<span style='color:{theme.AMBER}'>⏳ waiting…</span>"
+            else:
+                badge = f"<span style='color:{theme.GREEN}'>✓ done</span>"
+            try:
+                schema_txt = json.dumps(ex.schema, indent=2)
+            except Exception:
+                schema_txt = str(ex.schema)
+            blocks.append(
+                f"<h3 style='margin-bottom:2px'>{badge} &nbsp; {html.escape(ex.provider)} · "
+                f"<b>{html.escape(ex.model)}</b></h3>"
+                f"<p style='color:{theme.TEXT_DIM}; margin:2px 0'>SYSTEM PROMPT</p>{pre(ex.system)}"
+                f"<p style='color:{theme.TEXT_DIM}; margin:2px 0'>REQUEST (message sent to the model)</p>{pre(ex.user)}"
+                f"<p style='color:{theme.TEXT_DIM}; margin:2px 0'>REQUIRED OUTPUT SCHEMA (the JSON it must return)</p>{pre(schema_txt)}"
+                f"<p style='color:{theme.TEXT_DIM}; margin:2px 0'>RESPONSE</p>"
+                f"{pre(ex.error if not ex.ok else ex.response)}"
+                "<hr>"
+            )
+        self.ai_activity.setHtml("".join(blocks))
+        if _ex is not None:  # live event -> surface the tab
+            self.bottom_tabs.setTabText(1, "🤖 AI Activity ●")
 
     # ------------------------------------------------- raw device-read panel
     def _raw_label(self, device_id: str, kind: str, index: int) -> str | None:
@@ -1361,6 +1426,7 @@ class MainWindow(QMainWindow):
             self.show()
 
     def closeEvent(self, event):  # noqa: N802
+        llm.remove_listener(getattr(self, "_ai_listener", None))
         self.monitor.stop()
         # Wait out any in-flight worker threads so none is destroyed mid-run
         # (Qt aborts the process on "QThread destroyed while running").
