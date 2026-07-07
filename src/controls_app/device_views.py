@@ -251,8 +251,9 @@ def _alpha() -> tuple[list[Element], list[Decor]]:
         Element("right_rocker_bot", "RK2", "switch", (700, 150, 24, 42)),
         Element("right_white", "WHT", "round", (766, 104, 28, 28)),
         Element("right_red", "RED", "round", (766, 160, 28, 28)),
-        Element("sw_bat", "BAT", "switch", (172, 322, 34, 52)),
-        Element("sw_alt", "ALT", "switch", (238, 322, 34, 52)),
+        # Panel order matches the real Alpha: MASTER ALT, MASTER BAT, AVI 1, AVI 2
+        Element("sw_alt", "ALT", "switch", (172, 322, 34, 52)),
+        Element("sw_bat", "BAT", "switch", (238, 322, 34, 52)),
         Element("sw_avionics1", "AVI 1", "switch", (304, 322, 34, 52)),
         Element("sw_avionics2", "AVI 2", "switch", (370, 322, 34, 52)),
         Element("sw_light_bcn", "BCN", "switch", (462, 322, 34, 52)),
