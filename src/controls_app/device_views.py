@@ -46,6 +46,7 @@ class DeviceView(QWidget):
         self.pressed: dict[str, bool] = {}
         self.values: dict[str, float] = {}       # -1..1
         self.switch_dir: dict[str, int] = {}     # control_id -> -1 down / 0 neutral / +1 up
+        self.calibrated: set[str] = set()        # controls confirmed calibrated (green border)
         self.selected: str | None = None
         self.learn_mode = False
         self._pulse_seq: dict[str, int] = {}
@@ -85,6 +86,27 @@ class DeviceView(QWidget):
     def set_selected(self, control_id: str | None) -> None:
         self.selected = control_id
         self.update()
+
+    def set_calibrated(self, control_id: str, done: bool = True) -> None:
+        """Mark a control as successfully calibrated — it gets a green border that
+        stays, so you can see your progress across a calibration run."""
+        if done:
+            self.calibrated.add(control_id)
+        else:
+            self.calibrated.discard(control_id)
+        self.update()
+
+    def clear_calibrated(self) -> None:
+        self.calibrated.clear()
+        self.update()
+
+    def toggle_switch(self, control_id: str) -> int:
+        """Cycle a switch's shown position up -> down -> up (click to sync the
+        picture with a maintained physical switch). Returns the new direction."""
+        cur = self.switch_dir.get(control_id, 0)
+        new = -1 if cur > 0 else 1      # up -> down; neutral/down -> up
+        self.set_switch(control_id, new)
+        return new
 
     # ------------------------------------------------------------ events
     def _transform(self) -> tuple[float, float, float]:
@@ -139,7 +161,9 @@ class DeviceView(QWidget):
                 p.drawRoundedRect(rect.adjusted(-5, -5, 5, 5), 8, 8)
 
             pen = QPen(accent if on else border, 2 if on else 1.2)
-            if self.learn_mode and self.selected == el.id:
+            if el.id in self.calibrated:                 # calibrated -> solid green, stays
+                pen = QPen(QColor(theme.GREEN), 2)
+            if self.learn_mode and self.selected == el.id:   # being calibrated NOW -> amber
                 pen = QPen(QColor(theme.AMBER), 2, Qt.PenStyle.DashLine)
             p.setPen(pen)
 

@@ -1130,10 +1130,11 @@ class MainWindow(QMainWindow):
             prompt = labels[0]
         self.status.setText(f"Learn '{control_id}': {prompt}…")
 
-    def _finish_button_learn(self, imap, learn) -> None:
+    def _finish_button_learn(self, imap, learn, device_id) -> None:
         """Persist a completed button/switch capture and advance calibration."""
         imap.set_control_buttons(learn["control"], learn["buffer"])
         save_maps(self.maps)
+        self.views[device_id].set_calibrated(learn["control"])
         self.status.setText(
             f"Learned {learn['control']} → buttons {learn['buffer']} (saved)"
         )
@@ -1156,6 +1157,7 @@ class MainWindow(QMainWindow):
         if not controls:
             return
         self._calib = {"device": device_id, "order": controls, "idx": -1}
+        self.views[device_id].clear_calibrated()   # fresh run: no green until re-done
         if self.rawview_btn.isChecked():
             self.rawview_btn.setChecked(False)  # show the diagram so highlights are visible
         self.skip_btn.show()
@@ -1204,10 +1206,10 @@ class MainWindow(QMainWindow):
         # A fresh token invalidates any countdown still ticking from a control the
         # user skipped/jumped away from.
         self._calib_gen = getattr(self, "_calib_gen", 0) + 1
-        if calib["idx"] == 0:
-            self._calib_begin(control_id)       # first control: no wait
-        else:
-            self._calib_countdown(self._calib_gen, control_id, CALIB_GAP_S)
+        # Every control gets the get-ready countdown — including the first, which
+        # on every device is an axis; without this the first axis started with no
+        # delay and looked like "axes don't wait".
+        self._calib_countdown(self._calib_gen, control_id, CALIB_GAP_S)
 
     def _calib_countdown(self, gen: int, control_id: str, remaining: int) -> None:
         calib = getattr(self, "_calib", None)
@@ -1279,12 +1281,12 @@ class MainWindow(QMainWindow):
                 # can't produce a second distinct index — the user pressing the
                 # same one again finalizes it instead of hanging the capture.
                 if learn.get("is_switch") and learn["buffer"]:
-                    self._finish_button_learn(imap, learn)
+                    self._finish_button_learn(imap, learn, device_id)
                 return  # otherwise ignore a repeat of an already-captured slot
             learn["buffer"].append(index)
             view.pulse(learn["control"])
             if len(learn["buffer"]) >= len(learn["labels"]):
-                self._finish_button_learn(imap, learn)
+                self._finish_button_learn(imap, learn, device_id)
             else:
                 nxt = learn["labels"][len(learn["buffer"])]
                 self.status.setText(f"Learn '{learn['control']}': now {nxt}…")
@@ -1325,6 +1327,7 @@ class MainWindow(QMainWindow):
             if spans[lead] > 0.5 and spans[lead] >= max(others, default=0.0) + 0.3:
                 imap.learn_axis(lead, learn["control"])
                 save_maps(self.maps)
+                view.set_calibrated(learn["control"])
                 self.status.setText(f"Learned {learn['control']} → axis {lead} (saved)")
                 self._learn = None
                 self._after_capture()
@@ -1342,6 +1345,7 @@ class MainWindow(QMainWindow):
         if view.learn_mode and learn and learn.get("is_hat"):
             imap.learn_hat(index, learn["control"])
             save_maps(self.maps)
+            view.set_calibrated(learn["control"])
             self.status.setText(f"Learned {learn['control']} → hat {index} (saved)")
             view.pulse(learn["control"])
             self._learn = None
@@ -1353,7 +1357,16 @@ class MainWindow(QMainWindow):
 
     def _on_element_clicked(self, control_id: str) -> None:
         view = self.view_stack.currentWidget()
-        if not isinstance(view, DeviceView) or not view.learn_mode:
+        if not isinstance(view, DeviceView):
+            return
+        if not view.learn_mode:
+            # Outside calibration: click a switch to flip its SHOWN position so the
+            # picture matches the real, maintained switch (the app can't know a
+            # switch's rest state, and some read backward). Display-only sync.
+            if self._control_kind(view.device_id, control_id) == "switch":
+                new = view.toggle_switch(control_id)
+                pos = {1: "UP / on", -1: "DOWN / off", 0: "centered"}.get(new, "?")
+                self._set_status(f"{control_id}: shown as {pos} (click to flip)", theme.ACCENT)
             return
         if getattr(self, "_calib", None) is not None:
             self._calib_jump(control_id)   # click a control to (re)calibrate it

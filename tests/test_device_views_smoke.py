@@ -39,3 +39,30 @@ def test_switch_directions_render(_app):
     # the legacy single-boolean path still renders for controls with no direction
     view.set_pressed("sw2", True)
     _render(view)
+
+
+def test_calibrated_border_state(_app):
+    elements, decor = _bravo()
+    view = DeviceView("honeycomb_bravo", elements, decor)
+    view.resize(1000, 460)
+
+    assert "lever1" not in view.calibrated
+    view.set_calibrated("lever1")
+    assert "lever1" in view.calibrated      # green border, stays
+    _render(view)                            # renders with the green pen
+    view.set_calibrated("lever1", done=False)
+    assert "lever1" not in view.calibrated
+    view.set_calibrated("lever2")
+    view.clear_calibrated()                  # fresh run wipes all green
+    assert not view.calibrated
+
+
+def test_toggle_switch_flips_position(_app):
+    elements, decor = _bravo()
+    view = DeviceView("honeycomb_bravo", elements, decor)
+    # neutral -> up -> down -> up (click to sync a maintained switch)
+    assert view.toggle_switch("sw1") == 1
+    assert view.switch_dir["sw1"] == 1
+    assert view.toggle_switch("sw1") == -1
+    assert view.toggle_switch("sw1") == 1
+    _render(view)
