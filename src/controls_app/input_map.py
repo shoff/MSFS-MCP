@@ -134,6 +134,16 @@ class InputMap:
     def buttons_for_control(self, control_id: str) -> list[int]:
         return list(self.buttons.get(control_id, []))
 
+    def button_slot(self, control_id: str, index: int) -> int | None:
+        """Position of a physical button within a control's ordered mapping.
+
+        For a two-position rocker mapped as [upButton, downButton] this is what
+        tells the diagram which WAY the switch moved: slot 0 == up, slot 1 ==
+        down. Returns None if the button isn't mapped to this control.
+        """
+        idxs = self.buttons.get(control_id, [])
+        return idxs.index(index) if index in idxs else None
+
     def axis_for_control(self, control_id: str) -> int | None:
         for i, c in self.axes.items():
             if c == control_id:

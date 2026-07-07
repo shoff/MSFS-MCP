@@ -1092,11 +1092,29 @@ class MainWindow(QMainWindow):
                            "labels": ["move the hat"], "buffer": []}
             prompt = "push the hat in any direction"
         else:
-            labels = list(spec.slots) if (spec and spec.kind == "button" and len(spec.slots) > 1) else ["press it"]
+            is_switch = kind == "switch"
+            if spec and spec.kind == "button" and len(spec.slots) > 1:
+                labels = list(spec.slots)
+            elif is_switch:
+                # Capture both positions in order so the diagram can show up vs
+                # down. A single-button switch finalizes early (see _on_button).
+                labels = ["flip it UP", "flip it DOWN"]
+            else:
+                labels = ["press it"]
             self._learn = {"control": control_id, "is_axis": False, "is_hat": False,
-                           "labels": labels, "buffer": []}
+                           "is_switch": is_switch, "labels": labels, "buffer": []}
             prompt = labels[0]
         self.status.setText(f"Learn '{control_id}': {prompt}…")
+
+    def _finish_button_learn(self, imap, learn) -> None:
+        """Persist a completed button/switch capture and advance calibration."""
+        imap.set_control_buttons(learn["control"], learn["buffer"])
+        save_maps(self.maps)
+        self.status.setText(
+            f"Learned {learn['control']} → buttons {learn['buffer']} (saved)"
+        )
+        self._learn = None
+        self._after_capture()
 
     def _learn_active(self, control_id: str) -> bool:
         return getattr(self, "_learn", None) is not None and self._learn["control"] == control_id
@@ -1196,24 +1214,31 @@ class MainWindow(QMainWindow):
         learn = getattr(self, "_learn", None)
         if pressed and view.learn_mode and learn and not learn["is_axis"] and not learn.get("is_hat"):
             if index in learn["buffer"]:
-                return  # ignore a repeat of an already-captured slot
+                # A switch that reports only ONE button (flip up == flip down)
+                # can't produce a second distinct index — the user pressing the
+                # same one again finalizes it instead of hanging the capture.
+                if learn.get("is_switch") and learn["buffer"]:
+                    self._finish_button_learn(imap, learn)
+                return  # otherwise ignore a repeat of an already-captured slot
             learn["buffer"].append(index)
             view.pulse(learn["control"])
             if len(learn["buffer"]) >= len(learn["labels"]):
-                imap.set_control_buttons(learn["control"], learn["buffer"])
-                save_maps(self.maps)
-                self.status.setText(
-                    f"Learned {learn['control']} → buttons {learn['buffer']} (saved)"
-                )
-                self._learn = None
-                self._after_capture()
+                self._finish_button_learn(imap, learn)
             else:
                 nxt = learn["labels"][len(learn["buffer"])]
                 self.status.setText(f"Learn '{learn['control']}': now {nxt}…")
             return
         control = imap.control_for_button(index)
         if control:
-            view.set_pressed(control, pressed)
+            slots = imap.buttons_for_control(control)
+            if self._control_kind(device_id, control) == "switch" and len(slots) >= 2:
+                # Two-position rocker: slot 0 == up, slot 1 == down. Show the
+                # real direction instead of a single generic "pressed" state.
+                slot = imap.button_slot(control, index)
+                direction = (1 if slot == 0 else -1) if pressed else 0
+                view.set_switch(control, direction)
+            else:
+                view.set_pressed(control, pressed)
 
     def _on_axis(self, device_id: str, index: int, value: float) -> None:
         view, imap = self._view_and_map(device_id)

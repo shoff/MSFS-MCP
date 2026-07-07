@@ -45,6 +45,7 @@ class DeviceView(QWidget):
         self.decor = decor or []
         self.pressed: dict[str, bool] = {}
         self.values: dict[str, float] = {}       # -1..1
+        self.switch_dir: dict[str, int] = {}     # control_id -> -1 down / 0 neutral / +1 up
         self.selected: str | None = None
         self.learn_mode = False
         self._pulse_seq: dict[str, int] = {}
@@ -54,6 +55,13 @@ class DeviceView(QWidget):
     # ------------------------------------------------------------- state
     def set_pressed(self, control_id: str, on: bool) -> None:
         self.pressed[control_id] = on
+        self.update()
+
+    def set_switch(self, control_id: str, direction: int) -> None:
+        """Show a two-position switch/rocker's actual position: +1 up, -1 down,
+        0 neutral. Distinct from set_pressed so up and down render differently."""
+        self.switch_dir[control_id] = direction
+        self.pressed[control_id] = direction != 0
         self.update()
 
     def pulse(self, control_id: str) -> None:
@@ -184,10 +192,19 @@ class DeviceView(QWidget):
                 p.setBrush(QColor(theme.ROW_HOVER) if on else base)
                 p.drawRoundedRect(rect, 4, 4)
                 nub_h = rect.height() * 0.42
-                nub = QRectF(rect.x() + 2, rect.y() + 2 if on else rect.bottom() - nub_h - 2,
-                             rect.width() - 4, nub_h)
+                direction = self.switch_dir.get(el.id)
+                if direction is None:               # legacy on/off: on -> up nub
+                    nub_y = rect.y() + 2 if on else rect.bottom() - nub_h - 2
+                    lit = on
+                elif direction > 0:                 # flipped up
+                    nub_y, lit = rect.y() + 2, True
+                elif direction < 0:                 # flipped down
+                    nub_y, lit = rect.bottom() - nub_h - 2, True
+                else:                               # centered / released
+                    nub_y, lit = rect.y() + (rect.height() - nub_h) / 2, False
+                nub = QRectF(rect.x() + 2, nub_y, rect.width() - 4, nub_h)
                 p.setPen(Qt.PenStyle.NoPen)
-                p.setBrush(accent if on else QColor(theme.TEXT_FAINT))
+                p.setBrush(accent if lit else QColor(theme.TEXT_FAINT))
                 p.drawRoundedRect(nub, 3, 3)
             else:  # button / big
                 p.setBrush(QColor(theme.ROW_HOVER) if on else base)
