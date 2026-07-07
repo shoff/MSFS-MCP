@@ -90,8 +90,8 @@ are only guesses.
   `self._hid['velocityone_rudder']`. Covered by `tests/test_hid_input.py`.
 - Report layout (offset 1 after the report id): `[01][brakeL lo/hi][brakeR lo/hi]
   [rudder lo/hi]…`, each 16-bit LE, 0..65535 → −1..1 (rudder centered 0x7fff).
-- REMAINING to confirm with the user MOVING the pedals: left/right brake order and
-  rudder LEFT/RIGHT sign (may need swap/invert). The read itself is confirmed good.
+- CONFIRMED FULLY WORKING by the user (2026-07-06): rudder read, direction, and
+  left/right brake order are all correct. No further rudder work needed.
 
 ### 2. Calibrate button "doesn't work" on Bravo / rudder
 - For the **rudder**: same root cause as #1 — no input events reach the app, so
