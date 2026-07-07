@@ -112,7 +112,7 @@ VELOCITYONE_RUDDER = DeviceProfile(
     id="velocityone_rudder",
     name="VelocityOne Rudder (Pedals)",
     manufacturer="Turtle Beach",
-    usb_ids=[(0x10F5, 0x7008)],
+    usb_ids=[(0x10F5, 0x7012)],
     match_names=[
         "velocityone rudder", "velocity one rudder", "turtle beach rudder",
         "rudder pedals",  # many drivers report it as "... Rudder Pedals"

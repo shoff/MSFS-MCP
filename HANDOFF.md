@@ -56,33 +56,42 @@ are only guesses.
 
 ## OPEN ISSUES (in priority order)
 
-### 1. Rudder pedals not working (HIGHEST — user is furious)
-- Root cause: SDL/pygame filters HID devices by *usage page*; the VelocityOne
-  Rudder declares a Simulation-Controls usage page (0x02) that SDL skips, so it
-  never appears in pygame's joystick list.
-- Fix in progress: read the device directly off the USB HID bus via **hidapi**.
-  - `src/controls_app/hid_input.py`: `enumerate_devices()`, `HidReader`,
-    `HidAxisDevice` (parses 16-bit LE axes from raw reports), `find_for_device()`.
-  - `InputMonitor._open_hid_fallback()` matches a bindable device SDL missed to a
-    HID device (by USB id / vendor `10F5` / product name) and opens it.
-  - `InputMonitor._poll_hid()` emits `axis_changed` under `velocityone_rudder`.
-- **Why it may STILL not work on the user's machine:**
-  1. **hidapi was very likely never installed** — their `.venv` predates adding
-     `hidapi` to the extras, and the launcher's `.deps-installed` marker skipped
-     reinstall. JUST fixed by versioning the marker (`DEP_VERSION=3` in the
-     `.cmd` files) so it reinstalls. **The user must `git pull` and re-run
-     `run-controls.cmd`** for hidapi to install. This is the single most likely
-     unblock. CONFIRM THIS FIRST.
-  2. If hidapi is installed but the rudder still doesn't appear: get the user to
-     open **🔎 Hardware** and report exactly what the "Raw USB scan" section
-     lists (product name + `VID:PID` + usage). Then adjust `find_for_device`.
-  3. HID axis parsing (`HidAxisDevice.poll`) is a *guess* (16-bit LE fields,
-     auto-skip a constant report-id byte). The axis count/scaling may be wrong
-     for this specific device. Use the raw bytes the user reports (which bytes
-     change when they press each pedal) to fix the parsing. This is the part you
-     cannot get right without the user's byte data.
-- Smoke pattern: `smoke_hidrudder` faked `hid_input` (available/enumerate/HidReader)
-  and drove `_open_hid_fallback` + `_poll_hid`; recreate similarly.
+### 0. LIVE SIMCONNECT BRIDGE (new — the real rudder fix)
+- `src/controls_app/sim_bridge.py`: reads the same live input the diagram gets and
+  pushes it into the sim as SimConnect events (`RUDDER_SET`, `THROTTLE_SET`,
+  `FLAPS_INCR` …). This is the ONLY way the rudder can work — MSFS can't enumerate
+  it, so profile bindings for it are meaningless. `resolve_bridge_routes()` (pure,
+  tested) turns plan+InputMap into index→event routes via `settings_registry`.
+  `SimBridge(QThread)` owns the SimConnect link off the GUI thread.
+- UI: "🔗 Drive sim" toolbar toggle. `_on_axis`/`_on_button` dispatch to the bridge,
+  suppressed during Learn/Calibrate.
+- STILL NEEDS real-sim confirmation: axis DIRECTION/sign per control (add a per-axis
+  invert when the user reports a reversed throttle/rudder). throttle/mixture use
+  unsigned 0..16383; flight controls signed -16383..16383 — may need tuning.
+- NOTE: the "write bindings into MSFS profile" path (issue #1 below) is now the
+  FALLBACK for devices MSFS *can* see; the bridge is preferred and device-agnostic.
+
+### 1. Rudder HID read — FIXED (hardware-verified on the user's machine)
+- The pedals ARE on the HID bus as **VID 0x10F5 : PID 0x7012** (not 0x7008, now
+  corrected in `devices.py`). hidapi was installed and working the whole time.
+- Three real bugs, all fixed & verified against the live device:
+  1. The device exposes TWO interfaces — a vendor page (`usage_page 0xff01`) and a
+     Generic-Desktop **gamepad** (`0x01`/`0x05`) that carries the axes.
+     `find_for_device` returned the FIRST vendor match (the vendor page → no axes).
+     Now prefers the Generic-Desktop joystick/gamepad interface. (`hid_input.py`)
+  2. Reports are 64 bytes led by a `0x01` report-id byte. `_update_offset` only
+     stripped it when the report length was *odd*, but hidapi's read length is the
+     64-byte buffer, not the true report length, so it never stripped it and every
+     axis was misaligned. Now strips a constant non-zero lead byte. (`hid_input.py`)
+  3. (PID fix above.)
+- Verified live: `find_for_device` picks the gamepad iface; `HidAxisDevice` parses
+  axis0/1 = brakes (−1.0 released), axis2 = rudder (0.0 centered) — matching the
+  default map {0:brake_left,1:brake_right,2:rudder}. `InputMonitor` opens it into
+  `self._hid['velocityone_rudder']`. Covered by `tests/test_hid_input.py`.
+- Report layout (offset 1 after the report id): `[01][brakeL lo/hi][brakeR lo/hi]
+  [rudder lo/hi]…`, each 16-bit LE, 0..65535 → −1..1 (rudder centered 0x7fff).
+- REMAINING to confirm with the user MOVING the pedals: left/right brake order and
+  rudder LEFT/RIGHT sign (may need swap/invert). The read itself is confirmed good.
 
 ### 2. Calibrate button "doesn't work" on Bravo / rudder
 - For the **rudder**: same root cause as #1 — no input events reach the app, so

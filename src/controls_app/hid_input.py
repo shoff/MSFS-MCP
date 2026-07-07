@@ -120,8 +120,11 @@ class HidAxisDevice:
         return self._reader.ok
 
     def _update_offset(self, data: list[int]) -> None:
-        # If byte 0 stays constant across the first several reports while later
-        # bytes vary, it's a report id — skip it so axis fields align.
+        # A byte-0 that stays constant and non-zero across the first several
+        # reports is a HID report id that hidapi prepends; skip it so the 16-bit
+        # axis fields align. (We can't use length parity to detect this: hidapi's
+        # read length is our 64-byte buffer, not the true report length. The
+        # VelocityOne rudder, for instance, streams `01 .. <rudder@5:7> ..`.)
         if self._id_stable >= 6 or not data:
             return
         if self._id_byte is None:
@@ -129,8 +132,8 @@ class HidAxisDevice:
             self._id_stable = 1
         elif data[0] == self._id_byte:
             self._id_stable += 1
-            if self._id_stable >= 6 and len(data) % 2 == 1:
-                self._offset = 1  # odd length + constant lead byte -> report id
+            if self._id_stable >= 6 and self._id_byte != 0:
+                self._offset = 1
         else:
             self._id_byte, self._id_stable, self._offset = None, 0, 0
 
@@ -162,10 +165,21 @@ def find_for_device(usb_ids, match_names) -> dict | None:
     vendors = {vid for vid, _pid in usb_ids}
     norm_names = ["".join(ch for ch in n.lower() if ch.isalnum()) for n in match_names]
     devices = enumerate_devices()
-    # 1) trust an exact USB id or vendor match, whatever the usage page says
-    for h in devices:
-        if (h["vid"], h["pid"]) in usb_ids or (h["vid"] and h["vid"] in vendors):
-            return h
+
+    def is_axis_iface(h) -> bool:
+        # The axes live on the Generic-Desktop joystick/gamepad interface, NOT on
+        # a vendor/config interface. A multi-interface device (e.g. the VelocityOne
+        # rudder: MI_00 gamepad + MI_01 vendor page) must be read on the game one.
+        return h["usage_page"] == 0x01 and h["usage"] in _GAME_USAGES_GD
+
+    # 1) exact-id or vendor match, PREFERRING the game interface over any others.
+    id_matches = [
+        h for h in devices
+        if (h["vid"], h["pid"]) in usb_ids or (h["vid"] and h["vid"] in vendors)
+    ]
+    if id_matches:
+        game = [h for h in id_matches if is_axis_iface(h)]
+        return (game or id_matches)[0]
     # 2) fall back to product-name match on game-like devices
     for h in devices:
         if not h["looks_game"]:
