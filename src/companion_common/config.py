@@ -32,13 +32,16 @@ CONFIG_ENV = "MSFS_COMPANION_CONFIG"
 FILE_NAME = "msfs-companion.conf"
 HOME_CONFIG = Path.home() / ".msfs_companion" / "config.conf"
 
-# friendly key -> the environment variable the LLM layer actually reads
+# friendly key -> the environment variable the app actually reads
 KEY_TO_ENV = {
     "provider": "MSFS_COMPANION_LLM",
     "model": "MSFS_COMPANION_MODEL",
     "base_url": "MSFS_COMPANION_LLM_BASE_URL",
     "openai_api_key": "OPENAI_API_KEY",
     "anthropic_api_key": "ANTHROPIC_API_KEY",
+    # When true, the controls app builds an AI-tailored setup automatically on
+    # launch / aircraft change (default on). Set to false to require the button.
+    "auto_setup": "MSFS_COMPANION_AUTO_SETUP",
 }
 
 

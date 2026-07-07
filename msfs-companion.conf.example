@@ -24,3 +24,7 @@ openai_api_key = sk-REPLACE_ME
 # Optional: endpoint for the openai/local providers (OpenAI-compatible servers).
 # The local default is http://localhost:11434/v1 (Ollama).
 # base_url = http://localhost:11434/v1
+
+# The controls app builds an AI-tailored setup automatically on launch and when
+# you switch aircraft (default on). Set to false to only build it on the button.
+# auto_setup = true

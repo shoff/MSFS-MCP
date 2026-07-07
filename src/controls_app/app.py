@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import sys
 
-from PyQt6.QtCore import Qt, QEvent, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication,
@@ -157,6 +157,15 @@ class ProfileScanWorker(QThread):
             self.scanned.emit(msfs_profiles.find_profiles(self.extra))
         except Exception:
             self.scanned.emit([])
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    import os
+
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in ("0", "false", "no", "off")
 
 
 def _aircraft_context(aircraft_key: str) -> str:
@@ -346,6 +355,13 @@ class MainWindow(QMainWindow):
         self.detected = detected
         self.plan: ControlPlan | None = None
         self.worker: AdvisorWorker | None = None
+        self._ask_timer = QTimer(self)
+        self._ask_timer.setInterval(500)
+        self._ask_timer.timeout.connect(self._tick_ask)
+        self._ask_ticks = 0
+        self._ask_auto = False
+        self._ai_done: set[str] = set()  # aircraft already auto-set-up this session
+        self._auto_setup_enabled = _env_flag("MSFS_COMPANION_AUTO_SETUP", default=True)
         self.maps = load_maps()
         self.views: dict[str, DeviceView] = build_views()
 
@@ -393,6 +409,10 @@ class MainWindow(QMainWindow):
         self.mcp_worker.result.connect(self._on_mcp_autostart)
         self.mcp_worker.start()
 
+        # Build the AI setup automatically once the window is up (deferred so the
+        # UI paints first and the progress feedback is visible).
+        QTimer.singleShot(0, self._maybe_auto_setup)
+
     # -------------------------------------------------------------- header
     def _build_header(self) -> QWidget:
         header = QWidget(objectName="Header")
@@ -411,15 +431,16 @@ class MainWindow(QMainWindow):
         self.aircraft_combo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         for key, plan in self.plans.items():
             self.aircraft_combo.addItem(plan.aircraft_name, key)
-        self.aircraft_combo.currentIndexChanged.connect(lambda _i: self._load_plan_for_aircraft())
+        self.aircraft_combo.currentIndexChanged.connect(lambda _i: self._on_aircraft_change())
         lay.addWidget(self.aircraft_combo)
 
-        self.ask_btn = QPushButton("✦ Ask AI", objectName="AskButton")
+        self.ask_btn = QPushButton("✦ AI Setup", objectName="AskButton")
         self.ask_btn.setToolTip(
-            "Send your aircraft, detected hardware and the current plan to Claude\n"
-            "for a tailored review (needs ANTHROPIC_API_KEY)."
+            "Build a complete binding setup for this aircraft and your detected\n"
+            "hardware. Runs automatically on launch when an AI provider is set in\n"
+            "msfs-companion.conf; click to rebuild (e.g. after changing your notes)."
         )
-        self.ask_btn.clicked.connect(self._ask_claude)
+        self.ask_btn.clicked.connect(lambda: self._ask_ai(auto=False))
         lay.addWidget(self.ask_btn)
 
         self.write_btn = QPushButton("⭳ Write to MSFS", objectName="WriteButton")
@@ -518,7 +539,7 @@ class MainWindow(QMainWindow):
         lay.setSpacing(8)
         self.notes = QLineEdit()
         self.notes.setPlaceholderText(
-            "Notes for Claude — e.g. \"no yoke yet, flying keyboard + Bravo\" or \"I want to practice IFR\"…"
+            "Notes for the AI setup — e.g. \"no yoke yet, flying keyboard + Bravo\" or \"I want to practice IFR\"…"
         )
         lay.addWidget(self.notes, 1)
         self.status = QLabel("", objectName="Hint")
@@ -549,8 +570,12 @@ class MainWindow(QMainWindow):
 
     def _load_plan_for_aircraft(self) -> None:
         self.plan = self.plans[self._current_aircraft_key()]
-        self.status.setText(f"Plan source: {self.plan.source}")
+        self._set_status(f"Setup source: {self.plan.source}")
         self._refresh_views()
+
+    def _on_aircraft_change(self) -> None:
+        self._load_plan_for_aircraft()
+        self._maybe_auto_setup()  # build the AI setup for the newly chosen aircraft
 
     def _current_device_id(self) -> str | None:
         item = self.sidebar.currentItem()
@@ -710,14 +735,45 @@ class MainWindow(QMainWindow):
                 view.pulse("mouse")
         return super().eventFilter(obj, event)
 
-    # -------------------------------------------------------------- Claude
-    def _ask_claude(self) -> None:
-        if self.worker and self.worker.isRunning():
+    # ---------------------------------------------------------------- status
+    def _set_status(self, text: str, color: str | None = None) -> None:
+        """Update the footer status line, optionally in a state color."""
+        self.status.setText(text)
+        self.status.setStyleSheet(f"color: {color};" if color else "")
+
+    # ------------------------------------------------------------------- AI
+    def _maybe_auto_setup(self) -> None:
+        """On launch / aircraft change, build the AI setup automatically (once
+        per aircraft per session) when a provider is configured. Otherwise the
+        built-in plan stays and we hint how to enable the tailored setup."""
+        if not self._auto_setup_enabled:
             return
         key = self._current_aircraft_key()
+        if key in self._ai_done:
+            return
+        if not llm.have_credentials():
+            self._set_status(
+                "Using the built-in setup — add an AI key in msfs-companion.conf "
+                "for one tailored to your hardware.", theme.TEXT_DIM,
+            )
+            return
+        self._ai_done.add(key)
+        self._ask_ai(auto=True)
+
+    def _ask_ai(self, auto: bool = False) -> None:
+        if self.worker and self.worker.isRunning():
+            return
+        if not llm.have_credentials():
+            note = "Set your provider and key in msfs-companion.conf, then click AI Setup."
+            self._set_status("AI not configured.", theme.AMBER)
+            QMessageBox.information(self, "Set up the AI first", llm.no_credentials_msg(note))
+            return
+        key = self._current_aircraft_key()
+        self._ask_auto = auto
         self.ask_btn.setEnabled(False)
-        self.ask_btn.setText("✦ Thinking…")
-        self.status.setText(f"Asking {llm.model_label()} to review this setup…")
+        self._ask_ticks = 0
+        self._ask_timer.start()
+        self._tick_ask()  # paint immediately so there's instant feedback
         self.worker = AdvisorWorker(
             {
                 "aircraft_key": key,
@@ -732,21 +788,38 @@ class MainWindow(QMainWindow):
         self.worker.failed.connect(self._on_plan_failed)
         self.worker.start()
 
+    def _tick_ask(self) -> None:
+        """Animate the button + status so a long call clearly looks alive."""
+        self._ask_ticks += 1
+        secs = self._ask_ticks // 2
+        dots = "." * (self._ask_ticks % 4)
+        self.ask_btn.setText(f"✦ Building{dots}")
+        self._set_status(
+            f"✦ Building your {self.plans[self._current_aircraft_key()].aircraft_name} "
+            f"setup with {llm.model_label()}…  {secs}s", theme.ACCENT,
+        )
+
     def _on_plan_ready(self, plan: ControlPlan) -> None:
         self.plans[plan.aircraft_key] = plan
         self._reset_ask_button()
         if plan.aircraft_key == self._current_aircraft_key():
             self.plan = plan
-            self.status.setText(f"Plan source: {plan.source}")
             self._refresh_views()
+        self._set_status(
+            f"✓ {plan.aircraft_name} setup ready (by {plan.source}). "
+            f"Pick a device and ‘Write to MSFS’ to apply it.", theme.GREEN,
+        )
 
     def _on_plan_failed(self, message: str) -> None:
         self._reset_ask_button()
-        self.status.setText(message)
+        self._set_status("✕ AI setup didn’t complete — using the built-in plan.", theme.RED)
+        if not getattr(self, "_ask_auto", False):
+            QMessageBox.warning(self, "AI setup didn’t complete", message)
 
     def _reset_ask_button(self) -> None:
+        self._ask_timer.stop()
         self.ask_btn.setEnabled(True)
-        self.ask_btn.setText("✦ Ask AI")
+        self.ask_btn.setText("✦ AI Setup")
 
     # ------------------------------------------------------------ profiles
     def _write_to_msfs(self) -> None:

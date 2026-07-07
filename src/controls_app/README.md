@@ -90,9 +90,18 @@ turning off rudder assists) and a flow guide connecting each control to the
 checklist phases — including the *teaching* bindings, like deliberately
 leaving the Bravo's prop lever unbound on a fixed-pitch aircraft.
 
-## The Claude integration
+## The AI integration
 
-Press **✦ Ask Claude** and the app sends:
+When an AI provider is configured, the app **builds a complete, tailored setup
+automatically** on launch and whenever you switch aircraft — you don't have to
+ask for it. A live progress indicator shows it working, and the result replaces
+the table as your ready-to-apply setup (then use **⭳ Write to MSFS** to apply
+it). Press **✦ AI Setup** any time to rebuild it (e.g. after editing your notes),
+and set `auto_setup = false` in `msfs-companion.conf` if you'd rather only build
+on the button. With no provider configured it falls back to the solid built-in
+plan and tells you how to enable the tailored one.
+
+Each build sends:
 
 - the chosen aircraft + its V-speeds and checklist phases (from the checklist app data),
 - the full hardware inventory with per-device detected/not-detected state,
