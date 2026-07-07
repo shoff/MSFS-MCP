@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# Input kinds: axis | lever | button | switch | switch3 | rotary | hat | wheel
-#   switch  = 2-position maintained (stays where you put it)
-#   switch3 = 3-position spring-return momentary: rests CENTER, push fwd/back,
-#             springs back to center (the Alpha yoke-grip switches)
+# Input kinds: axis | lever | button | switch | switch3 | switch3h | rotary | hat | wheel
+#   switch   = 2-position maintained (stays where you put it)
+#   switch3  = 3-position spring-return momentary, VERTICAL: rests CENTER, push
+#              forward / pull back, springs to center (Alpha LEFT grip)
+#   switch3h = same but HORIZONTAL: push left / right (Alpha RIGHT grip)
 
 
 @dataclass
@@ -58,9 +59,9 @@ HONEYCOMB_ALPHA = DeviceProfile(
         ControlInput("left_rocker_l", "Left rocker — left (2-way)", "switch3"),
         ControlInput("left_rocker_r", "Left rocker — right (2-way)", "switch3"),
         ControlInput("left_trigger", "Trigger (left grip)", "button"),
-        # RIGHT grip: TWO stacked 3-position spring switches, white button, red button
-        ControlInput("right_rocker_top", "Right rocker — top (2-way)", "switch3"),
-        ControlInput("right_rocker_bot", "Right rocker — bottom (2-way)", "switch3"),
+        # RIGHT grip: TWO stacked 3-position spring switches (push LEFT/RIGHT), white, red
+        ControlInput("right_rocker_top", "Right rocker — top (2-way)", "switch3h"),
+        ControlInput("right_rocker_bot", "Right rocker — bottom (2-way)", "switch3h"),
         ControlInput("right_white", "White button (right grip)", "button"),
         ControlInput("right_red", "Red button (right grip)", "button"),
         ControlInput("sw_alt", "ALT rocker (switch panel)", "switch"),

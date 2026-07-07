@@ -61,21 +61,24 @@ def test_yoke_grip_switches_are_three_position(_app):
     from controls_app.device_views import _alpha
     from controls_app.devices import DEVICE_BY_ID
 
-    grips = ["left_rocker_l", "left_rocker_r", "right_rocker_top", "right_rocker_bot"]
-    # 3-position spring switch in the model...
+    # LEFT grip pushes forward/back (vertical), RIGHT grip pushes left/right (horizontal).
+    expect = {
+        "left_rocker_l": "switch3", "left_rocker_r": "switch3",
+        "right_rocker_top": "switch3h", "right_rocker_bot": "switch3h",
+    }
     model = {c.id: c.kind for c in DEVICE_BY_ID["honeycomb_alpha"].inputs}
-    assert all(model[g] == "switch3" for g in grips)
-    # ...and in the diagram.
+    assert {g: model[g] for g in expect} == expect
     elements, decor = _alpha()
     ekind = {e.id: e.kind for e in elements}
-    assert all(ekind[g] == "switch3" for g in grips)
+    assert {g: ekind[g] for g in expect} == expect
 
     view = DeviceView("honeycomb_alpha", elements, decor)
     view.resize(1000, 460)
     _render(view)                       # at rest (no switch_dir) -> center neutral, must render
-    for d in (1, -1, 0):                # forward / back / spring-centered
-        view.set_switch("left_rocker_l", d)
-        _render(view)
+    for cid in ("left_rocker_l", "right_rocker_top"):
+        for d in (1, -1, 0):            # fwd/back or left/right, then spring-centered
+            view.set_switch(cid, d)
+            _render(view)
 
 
 def test_toggle_switch_flips_position(_app):

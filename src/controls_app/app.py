@@ -58,9 +58,10 @@ PRIORITY_COLORS = {"essential": theme.RED, "recommended": theme.ACCENT, "optiona
 # lever, a released switch) isn't grabbed as the next control.
 CALIB_GAP_S = 4
 
-# Control kinds the diagram shows with an up/down/neutral nub. "switch" is a
-# 2-position maintained toggle; "switch3" a 3-position spring-return momentary.
-SWITCH_KINDS = ("switch", "switch3")
+# Control kinds the diagram shows with a positioned nub. "switch" is a 2-position
+# maintained toggle; "switch3"/"switch3h" are 3-position spring-return momentary
+# switches (vertical fwd/back and horizontal left/right respectively).
+SWITCH_KINDS = ("switch", "switch3", "switch3h")
 
 # How each device is named inside MSFS profile XML <Device DeviceName="...">
 MSFS_DEVICE_FRAGMENTS = {
@@ -1123,8 +1124,11 @@ class MainWindow(QMainWindow):
             is_switch = kind in SWITCH_KINDS
             if spec and spec.kind == "button" and len(spec.slots) > 1:
                 labels = list(spec.slots)
+            elif kind == "switch3h":
+                # 3-position spring switch, horizontal: capture both directions.
+                labels = ["push it RIGHT", "push it LEFT"]
             elif kind == "switch3":
-                # 3-position spring switch: capture both momentary directions.
+                # 3-position spring switch, vertical: capture both directions.
                 labels = ["push it FORWARD (away from you)", "pull it BACK (toward you)"]
             elif is_switch:
                 # Capture both positions in order so the diagram can show up vs
@@ -1371,10 +1375,12 @@ class MainWindow(QMainWindow):
             # Outside calibration: click a switch to flip its SHOWN position so the
             # picture matches the real, maintained switch (the app can't know a
             # switch's rest state, and some read backward). Display-only sync.
-            if self._control_kind(view.device_id, control_id) in SWITCH_KINDS:
+            kind = self._control_kind(view.device_id, control_id)
+            if kind in SWITCH_KINDS:
                 new = view.toggle_switch(control_id)
-                pos = {1: "UP / forward", -1: "DOWN / back", 0: "centered"}.get(new, "?")
-                self._set_status(f"{control_id}: shown as {pos} (click to flip)", theme.ACCENT)
+                names = ({1: "RIGHT", -1: "LEFT", 0: "centered"} if kind == "switch3h"
+                         else {1: "UP / forward", -1: "DOWN / back", 0: "centered"})
+                self._set_status(f"{control_id}: shown as {names[new]} (click to flip)", theme.ACCENT)
             return
         if getattr(self, "_calib", None) is not None:
             self._calib_jump(control_id)   # click a control to (re)calibrate it

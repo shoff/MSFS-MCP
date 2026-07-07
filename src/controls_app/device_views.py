@@ -251,6 +251,27 @@ class DeviceView(QWidget):
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(accent if direction != 0 else QColor(theme.TEXT_DIM))
                 p.drawRoundedRect(QRectF(rect.x() + 2, nub_y, rect.width() - 4, nub_h), 3, 3)
+            elif el.kind == "switch3h":
+                # 3-position spring-return momentary, HORIZONTAL: rests CENTER,
+                # flicks LEFT / RIGHT (Alpha right-grip switches).
+                p.setBrush(base)
+                p.drawRoundedRect(rect, 4, 4)
+                mid_x = rect.x() + rect.width() / 2
+                p.setPen(QPen(border, 1))
+                for fx in (0.16, 0.5, 0.84):
+                    x = rect.x() + rect.width() * fx
+                    p.drawLine(int(x), int(rect.y() + 4), int(x), int(rect.bottom() - 4))
+                nub_w = rect.width() * 0.28
+                direction = self.switch_dir.get(el.id, 0)   # default NEUTRAL (center)
+                if direction > 0:                            # flicked right
+                    nub_x = rect.right() - nub_w - 2
+                elif direction < 0:                          # flicked left
+                    nub_x = rect.x() + 2
+                else:                                        # spring-centered rest
+                    nub_x = mid_x - nub_w / 2
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(accent if direction != 0 else QColor(theme.TEXT_DIM))
+                p.drawRoundedRect(QRectF(nub_x, rect.y() + 2, nub_w, rect.height() - 4), 3, 3)
             else:  # button / big
                 p.setBrush(QColor(theme.ROW_HOVER) if on else base)
                 p.drawRoundedRect(rect, 7, 7)
@@ -308,9 +329,9 @@ def _alpha() -> tuple[list[Element], list[Decor]]:
         Element("left_rocker_l", "RK1", "switch3", (144, 150, 26, 58)),
         Element("left_rocker_r", "RK2", "switch3", (178, 150, 26, 58)),
         Element("left_trigger", "TRIG", "round", (256, 162, 28, 28)),
-        # RIGHT grip: TWO stacked 3-position spring switches + white + red
-        Element("right_rocker_top", "RK1", "switch3", (696, 96, 26, 54)),
-        Element("right_rocker_bot", "RK2", "switch3", (696, 156, 26, 54)),
+        # RIGHT grip: TWO stacked 3-position spring switches (push LEFT/RIGHT) + white + red
+        Element("right_rocker_top", "RK1", "switch3h", (676, 104, 60, 26)),
+        Element("right_rocker_bot", "RK2", "switch3h", (676, 160, 60, 26)),
         Element("right_white", "WHT", "round", (766, 104, 28, 28)),
         Element("right_red", "RED", "round", (766, 160, 28, 28)),
         # Panel order matches the real Alpha: MASTER ALT, MASTER BAT, AVI 1, AVI 2
