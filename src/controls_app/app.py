@@ -434,6 +434,7 @@ class DiagnosticsDialog(QDialog):
 
         self.view = QTextBrowser()
         lay.addWidget(self.view, 1)
+        self._hid_readers: dict = {}  # HID devices opened for the raw USB scan
 
         self.assign_combos: dict[str, QComboBox] = {}
         for device_id, label in self.BINDABLE:
@@ -508,16 +509,51 @@ class DiagnosticsDialog(QDialog):
         missing = [label for did, label in self.BINDABLE if did not in seen_ids]
         if missing:
             blocks.append(
-                f"<p style='color:{theme.AMBER}'>Not seen by the app: <b>{', '.join(missing)}</b>. "
-                "If a device works in Windows but isn’t listed above, the input library can’t read "
-                "it yet. Try, in the app folder: <b>.venv\\Scripts\\pip install -U pygame</b> and "
-                "reopen; if it still doesn’t appear, set the environment variable "
-                "<b>MSFS_COMPANION_SDL_HIDAPI=0</b> (forces DirectInput) and reopen.</p>"
+                f"<p style='color:{theme.AMBER}'>Not matched by the joystick library: "
+                f"<b>{', '.join(missing)}</b>. See the raw USB scan below.</p>"
             )
+        blocks.append(self._hid_section(snap))
         self.view.setHtml("".join(blocks))
+
+    def _hid_section(self, snap: list) -> str:
+        """Raw USB-HID bus scan — finds flight gear SDL can't (e.g. rudder pedals)."""
+        import html as _html
+
+        from . import hid_input
+        if not hid_input.available():
+            return (f"<hr><p style='color:{theme.TEXT_DIM}'>Raw USB scan unavailable — install it "
+                    "with <b>.venv\\Scripts\\pip install hidapi</b> and reopen to detect devices the "
+                    "joystick library can’t (like some rudder pedals).</p>")
+        sdl_ids = {(js["vid"], js["pid"]) for js in snap if js["vid"]}
+        missed = [h for h in hid_input.enumerate_devices()
+                  if h["looks_game"] and (h["vid"], h["pid"]) not in sdl_ids]
+        if not missed:
+            return (f"<hr><p style='color:{theme.TEXT_DIM}'>Raw USB scan: no extra game devices "
+                    "beyond those listed above.</p>")
+        out = [f"<hr><h3>Raw USB scan — devices the joystick library can’t read</h3>"]
+        for h in missed:
+            reader = self._hid_readers.get(h["path"])
+            if reader is None:
+                reader = hid_input.HidReader(h["path"])
+                self._hid_readers[h["path"]] = reader
+            data = reader.read() if reader.ok else []
+            byts = " ".join(f"{b:02X}" for b in data[:24]) or "—"
+            name = _html.escape(h["product"] or h["manufacturer"] or "HID device")
+            vidpid = f"{h['vid']:04X}:{h['pid']:04X}" if h["vid"] else "—"
+            out.append(
+                f"<p><b>{name}</b> <span style='color:{theme.GREEN}'>seen on the USB bus</span> "
+                f"<span style='color:{theme.TEXT_DIM}'>[USB {vidpid}, usage {h['usage_page']:#04x}/"
+                f"{h['usage']}]</span><br>"
+                f"<span style='color:{theme.ACCENT}; font-family:Consolas,monospace'>live bytes: {byts}</span>"
+                f"<br><span style='color:{theme.AMBER}'>Move the control — if these bytes change, the "
+                "app can read it directly. (Live axis wiring for HID-only devices is in progress.)</span></p>"
+            )
+        return "".join(out)
 
     def done(self, result: int) -> None:  # noqa: N802
         self._timer.stop()
+        for reader in self._hid_readers.values():
+            reader.close()
         super().done(result)
 
 
