@@ -53,6 +53,11 @@ from .sim_bridge import SimBridge, resolve_bridge_routes, scale_axis
 
 PRIORITY_COLORS = {"essential": theme.RED, "recommended": theme.ACCENT, "optional": theme.TEXT_FAINT}
 
+# Pause between controls during guided calibration. The countdown runs with
+# capture OFF so leftover motion from the control you just did (a still-moving
+# lever, a released switch) isn't grabbed as the next control.
+CALIB_GAP_S = 4
+
 # How each device is named inside MSFS profile XML <Device DeviceName="...">
 MSFS_DEVICE_FRAGMENTS = {
     "honeycomb_alpha": "Alpha Flight Controls",
@@ -1175,6 +1180,14 @@ class MainWindow(QMainWindow):
         calib["idx"] = calib["order"].index(control_id) - 1
         self._calib_next()
 
+    def _calib_banner(self, text: str) -> None:
+        self.input_banner.setText(text)
+        self.input_banner.setStyleSheet(
+            f"background: {theme.PANEL}; border: 1px solid {theme.ACCENT}; border-radius: 6px; "
+            f"padding: 6px 10px; color: {theme.ACCENT}; font-size: 13px; font-weight: 600;"
+        )
+        self.input_banner.show()
+
     def _calib_next(self) -> None:
         calib = getattr(self, "_calib", None)
         if calib is None:
@@ -1185,17 +1198,46 @@ class MainWindow(QMainWindow):
             return
         device_id, control_id = calib["device"], calib["order"][calib["idx"]]
         self.views[device_id].set_selected(control_id)
+        # Capture stays OFF until the control actually starts (see _calib_begin),
+        # so nothing is grabbed during the between-control countdown.
+        self._learn = None
+        # A fresh token invalidates any countdown still ticking from a control the
+        # user skipped/jumped away from.
+        self._calib_gen = getattr(self, "_calib_gen", 0) + 1
+        if calib["idx"] == 0:
+            self._calib_begin(control_id)       # first control: no wait
+        else:
+            self._calib_countdown(self._calib_gen, control_id, CALIB_GAP_S)
+
+    def _calib_countdown(self, gen: int, control_id: str, remaining: int) -> None:
+        calib = getattr(self, "_calib", None)
+        if calib is None or getattr(self, "_calib_gen", 0) != gen:
+            return  # calibration ended, or superseded by skip/jump/restart
+        if remaining <= 0:
+            self._calib_begin(control_id)
+            return
+        device_id = calib["device"]
+        label = next((c.label for c in DEVICE_BY_ID[device_id].inputs if c.id == control_id), control_id)
+        n, total = calib["idx"] + 1, len(calib["order"])
+        self._calib_banner(
+            f"🧭 Calibrate {n}/{total}: next is {label} — get ready… starting in {remaining}"
+        )
+        self._set_status(
+            f"Calibrate {n}/{total}: get ready for {label} — starting in {remaining}s "
+            "(let go of the last control)…", theme.ACCENT,
+        )
+        QTimer.singleShot(1000, lambda: self._calib_countdown(gen, control_id, remaining - 1))
+
+    def _calib_begin(self, control_id: str) -> None:
+        calib = getattr(self, "_calib", None)
+        if calib is None:
+            return
+        device_id = calib["device"]
         self._begin_capture(device_id, control_id)
         label = next((c.label for c in DEVICE_BY_ID[device_id].inputs if c.id == control_id), control_id)
         n, total = calib["idx"] + 1, len(calib["order"])
         how = self._learn.get("labels", ["operate it"])[0] if self._learn else "operate it"
-        # prominent banner so it's obvious calibration is running and what to do
-        self.input_banner.setText(f"🧭 Calibrate {n}/{total}: {label} — {how} now, or press Skip ▸")
-        self.input_banner.setStyleSheet(
-            f"background: {theme.PANEL}; border: 1px solid {theme.ACCENT}; border-radius: 6px; "
-            f"padding: 6px 10px; color: {theme.ACCENT}; font-size: 13px; font-weight: 600;"
-        )
-        self.input_banner.show()
+        self._calib_banner(f"🧭 Calibrate {n}/{total}: {label} — {how} now, or press Skip ▸")
         self._set_status(f"Calibrate {n}/{total}: {label} — {how} now, or press Skip.", theme.ACCENT)
 
     def _calib_skip(self) -> None:
