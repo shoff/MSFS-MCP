@@ -95,11 +95,25 @@ leaving the Bravo's prop lever unbound on a fixed-pitch aircraft.
 When an AI provider is configured, the app **builds a complete, tailored setup
 automatically** on launch and whenever you switch aircraft — you don't have to
 ask for it. A live progress indicator shows it working, and the result replaces
-the table as your ready-to-apply setup (then use **⭳ Write to MSFS** to apply
-it). Press **✦ AI Setup** any time to rebuild it (e.g. after editing your notes),
-and set `auto_setup = false` in `msfs-companion.conf` if you'd rather only build
-on the button. With no provider configured it falls back to the solid built-in
-plan and tells you how to enable the tailored one.
+the table as your ready-to-apply setup. Press **✦ AI Setup** any time to rebuild
+it (e.g. after editing your notes), and set `auto_setup = false` in
+`msfs-companion.conf` if you'd rather only build on the button. With no provider
+configured it falls back to the solid built-in plan and tells you how to enable
+the tailored one.
+
+**Applying it — and making manual changes.** By default the setup appears in the
+table and you apply it with **⭳ Write to MSFS** (per device, with a backup). For
+a fully hands-off flow, set `auto_write = true` in `msfs-companion.conf`: the app
+then writes the built setup straight into your matching MSFS input profiles
+(backing each up first) for every detected device. Either way you stay in
+control:
+
+- **🎯 Learn** — click a control on the diagram and operate the real one to remap
+  it; your remaps are saved and are honored by every subsequent write.
+- **⭳ Write to MSFS** — review the exact bindings per device before applying.
+- Auto-write runs once per aircraft per session and never overwrites your
+  in-session changes. MSFS must be restarted (or the profile reselected in
+  Options → Controls) to load written changes.
 
 Each build sends:
 

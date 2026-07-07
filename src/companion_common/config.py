@@ -42,6 +42,10 @@ KEY_TO_ENV = {
     # When true, the controls app builds an AI-tailored setup automatically on
     # launch / aircraft change (default on). Set to false to require the button.
     "auto_setup": "MSFS_COMPANION_AUTO_SETUP",
+    # When true, the built setup is written into your matching MSFS input
+    # profiles automatically (with backups). Default off — writing changes real
+    # sim files, so it's opt-in.
+    "auto_write": "MSFS_COMPANION_AUTO_WRITE",
 }
 
 

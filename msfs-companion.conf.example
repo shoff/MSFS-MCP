@@ -28,3 +28,10 @@ openai_api_key = sk-REPLACE_ME
 # The controls app builds an AI-tailored setup automatically on launch and when
 # you switch aircraft (default on). Set to false to only build it on the button.
 # auto_setup = true
+
+# Write the built setup straight into your matching MSFS input profiles
+# (with a timestamped backup), for a fully hands-off setup. Default off because
+# it changes real sim files. You still make manual changes with Learn mode and
+# the Write dialog, and MSFS must be restarted (or the profile reselected) to
+# load the changes.
+# auto_write = true

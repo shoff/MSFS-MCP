@@ -159,6 +159,62 @@ class ProfileScanWorker(QThread):
             self.scanned.emit([])
 
 
+class AutoWriteWorker(QThread):
+    """Write the AI setup into matching MSFS input profiles, off the GUI thread.
+
+    Emits a per-device result list; each is {device, ok, detail[, backup]}.
+    """
+
+    done = pyqtSignal(list)
+
+    def __init__(self, plan: ControlPlan, maps: dict, device_ids: list[str]):
+        super().__init__()
+        self.plan = plan
+        self.maps = maps
+        self.device_ids = device_ids
+
+    def run(self):
+        try:
+            profiles = msfs_profiles.find_profiles()
+        except Exception as exc:  # scanning shouldn't ever crash the app
+            self.done.emit([{"device": "MSFS profiles", "ok": False,
+                             "detail": f"could not scan for profiles: {exc}"}])
+            return
+        results = []
+        for device_id in self.device_ids:
+            device = DEVICE_BY_ID[device_id]
+            control_ids = {c.label: c.id for c in device.inputs}
+            resolved = msfs_profiles.resolve_writes(
+                self.plan.devices.get(device_id, []), control_ids, self.maps[device_id]
+            )
+            if not resolved.actions:
+                results.append({"device": device.name, "ok": False, "detail": "no bindable actions"})
+                continue
+            fragment = MSFS_DEVICE_FRAGMENTS.get(device_id, "")
+            prof = None
+            if fragment:
+                prof = next(
+                    (p for p in profiles
+                     if any(fragment.lower() in d.lower() for d in p.device_names)),
+                    None,
+                )
+            if prof is None:
+                results.append({"device": device.name, "ok": False,
+                                "detail": "no MSFS profile found — create one for this device "
+                                          "in MSFS Options → Controls, then rebuild"})
+                continue
+            try:
+                backup = msfs_profiles.write_bindings(
+                    prof.path, fragment, resolved.actions, backup_dir=msfs_profiles.BACKUP_DIR
+                )
+                results.append({"device": device.name, "ok": True,
+                                "detail": f"{len(resolved.actions)} bindings → “{prof.friendly_name}”",
+                                "backup": str(backup)})
+            except Exception as exc:
+                results.append({"device": device.name, "ok": False, "detail": f"write failed: {exc}"})
+        self.done.emit(results)
+
+
 def _env_flag(name: str, default: bool) -> bool:
     import os
 
@@ -361,7 +417,10 @@ class MainWindow(QMainWindow):
         self._ask_ticks = 0
         self._ask_auto = False
         self._ai_done: set[str] = set()  # aircraft already auto-set-up this session
+        self._written: set[str] = set()  # aircraft already auto-written this session
+        self._write_worker: AutoWriteWorker | None = None
         self._auto_setup_enabled = _env_flag("MSFS_COMPANION_AUTO_SETUP", default=True)
+        self._auto_write_enabled = _env_flag("MSFS_COMPANION_AUTO_WRITE", default=False)
         self.maps = load_maps()
         self.views: dict[str, DeviceView] = build_views()
 
@@ -805,10 +864,67 @@ class MainWindow(QMainWindow):
         if plan.aircraft_key == self._current_aircraft_key():
             self.plan = plan
             self._refresh_views()
-        self._set_status(
-            f"✓ {plan.aircraft_name} setup ready (by {plan.source}). "
-            f"Pick a device and ‘Write to MSFS’ to apply it.", theme.GREEN,
-        )
+        if self._auto_write_enabled:
+            self._maybe_auto_write(plan)
+        else:
+            self._set_status(
+                f"✓ {plan.aircraft_name} setup ready (by {plan.source}). "
+                f"Pick a device and ‘Write to MSFS’ to apply it.", theme.GREEN,
+            )
+
+    # ------------------------------------------------------------ auto-write
+    def _maybe_auto_write(self, plan: ControlPlan) -> None:
+        """Write the freshly-built setup into the matching MSFS profiles once
+        per aircraft per session. Honors the user's Learn-mode remaps (they're
+        in self.maps) and always backs up before changing anything."""
+        if plan.aircraft_key != self._current_aircraft_key():
+            return
+        if plan.aircraft_key in self._written:
+            return
+        if self._write_worker is not None and self._write_worker.isRunning():
+            return
+        device_ids = [d for d in ("honeycomb_alpha", "honeycomb_bravo", "velocityone_rudder")
+                      if self.detected.get(d)]
+        if not device_ids:
+            self._set_status(
+                f"✓ {plan.aircraft_name} setup ready — no bindable hardware detected to write.",
+                theme.GREEN,
+            )
+            return
+        self._written.add(plan.aircraft_key)
+        self._set_status("⭳ Writing the setup into your MSFS profiles (backing up first)…", theme.ACCENT)
+        self._write_worker = AutoWriteWorker(plan, self.maps, device_ids)
+        self._write_worker.setParent(self)
+        self._write_worker.done.connect(self._on_auto_write_done)
+        self._write_worker.start()
+
+    def _on_auto_write_done(self, results: list) -> None:
+        wrote = [r for r in results if r.get("ok")]
+        failed = [r for r in results if not r.get("ok")]
+        if wrote and not failed:
+            summary = " · ".join(f"{r['device']}: {r['detail']}" for r in wrote)
+            self._set_status(
+                f"✓ Written to MSFS — {summary}. Restart MSFS (or reselect the profile in "
+                f"Options → Controls) to load it.", theme.GREEN,
+            )
+        elif wrote:
+            self._set_status(
+                f"✓ Wrote {len(wrote)} device(s); {len(failed)} need attention — see the dialog.",
+                theme.AMBER,
+            )
+        else:
+            self._set_status("Setup ready, but nothing was auto-written — see the dialog.", theme.AMBER)
+        # Show details only when something needs the user's attention; a clean
+        # success stays hands-off (the green status names the outcome).
+        if failed:
+            lines = [("✓ " if r.get("ok") else "— ") + f"{r['device']}: {r['detail']}" for r in results]
+            QMessageBox.information(
+                self, "Auto-write to MSFS",
+                "AI setup written where possible (backups saved):\n\n" + "\n".join(lines)
+                + "\n\nTo make manual changes: use 🎯 Learn to remap a physical control, or "
+                "⭳ Write to MSFS to review and apply per device. Set auto_write = false in "
+                "msfs-companion.conf to stop auto-writing.",
+            )
 
     def _on_plan_failed(self, message: str) -> None:
         self._reset_ask_button()
@@ -867,7 +983,7 @@ class MainWindow(QMainWindow):
         self.monitor.stop()
         # Wait out any in-flight worker threads so none is destroyed mid-run
         # (Qt aborts the process on "QThread destroyed while running").
-        for attr in ("mcp_worker", "worker"):
+        for attr in ("mcp_worker", "worker", "_write_worker"):
             worker = getattr(self, attr, None)
             if worker is not None and worker.isRunning():
                 worker.wait(6000)

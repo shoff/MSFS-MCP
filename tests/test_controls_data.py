@@ -24,6 +24,20 @@ def test_device_matching():
     assert not HONEYCOMB_ALPHA.matches("Some Random Gamepad")
 
 
+def test_rudder_detected_across_name_variants():
+    # Whatever spacing/punctuation the driver reports, the Turtle Beach pedals
+    # should still be recognized (normalized name match).
+    for name in [
+        "VelocityOne Rudder",
+        "VelocityOne Rudder Pedals",
+        "Velocity One Rudder",
+        "Turtle Beach VelocityOne Rudder",
+        "Turtle Beach - VelocityOne Rudder Pedals",
+    ]:
+        assert VELOCITYONE_RUDDER.matches(name), name
+    assert not VELOCITYONE_RUDDER.matches("Honeycomb Bravo Throttle Quadrant")
+
+
 def test_vid_pid_parsed_from_sdl_guid():
     from controls_app.devices import vid_pid_from_guid
 

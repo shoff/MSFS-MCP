@@ -30,8 +30,14 @@ class DeviceProfile:
     def matches(self, name: str, vid: int | None = None, pid: int | None = None) -> bool:
         if vid is not None and pid is not None and (vid, pid) in self.usb_ids:
             return True
-        lowered = name.lower()
-        return any(m.lower() in lowered for m in self.match_names)
+        # Normalize away spacing/punctuation so "VelocityOne Rudder Pedals",
+        # "Velocity One Rudder" and "Turtle Beach VelocityOne Rudder" all match.
+        norm = _norm(name)
+        return any(_norm(m) in norm for m in self.match_names)
+
+
+def _norm(text: str) -> str:
+    return "".join(ch for ch in text.lower() if ch.isalnum())
 
 
 HONEYCOMB_ALPHA = DeviceProfile(
@@ -101,7 +107,10 @@ VELOCITYONE_RUDDER = DeviceProfile(
     name="VelocityOne Rudder (Pedals)",
     manufacturer="Turtle Beach",
     usb_ids=[(0x10F5, 0x7008)],
-    match_names=["velocityone rudder", "velocity one rudder", "turtle beach rudder"],
+    match_names=[
+        "velocityone rudder", "velocity one rudder", "turtle beach rudder",
+        "rudder pedals",  # many drivers report it as "... Rudder Pedals"
+    ],
     inputs=[
         ControlInput("rudder", "Rudder axis (slide pedals)", "axis"),
         ControlInput("brake_left", "Left toe brake", "axis"),
