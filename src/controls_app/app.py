@@ -1114,6 +1114,8 @@ class MainWindow(QMainWindow):
         if not controls:
             return
         self._calib = {"device": device_id, "order": controls, "idx": -1}
+        if self.rawview_btn.isChecked():
+            self.rawview_btn.setChecked(False)  # show the diagram so highlights are visible
         self.skip_btn.show()
         self.restart_btn.show()
         self.calib_btn.setEnabled(False)
@@ -1149,7 +1151,15 @@ class MainWindow(QMainWindow):
         self._begin_capture(device_id, control_id)
         label = next((c.label for c in DEVICE_BY_ID[device_id].inputs if c.id == control_id), control_id)
         n, total = calib["idx"] + 1, len(calib["order"])
-        self._set_status(f"Calibrate {n}/{total}: operate “{label}” now — or press Skip.", theme.ACCENT)
+        how = self._learn.get("labels", ["operate it"])[0] if self._learn else "operate it"
+        # prominent banner so it's obvious calibration is running and what to do
+        self.input_banner.setText(f"🧭 Calibrate {n}/{total}: {label} — {how} now, or press Skip ▸")
+        self.input_banner.setStyleSheet(
+            f"background: {theme.PANEL}; border: 1px solid {theme.ACCENT}; border-radius: 6px; "
+            f"padding: 6px 10px; color: {theme.ACCENT}; font-size: 13px; font-weight: 600;"
+        )
+        self.input_banner.show()
+        self._set_status(f"Calibrate {n}/{total}: {label} — {how} now, or press Skip.", theme.ACCENT)
 
     def _calib_skip(self) -> None:
         if getattr(self, "_calib", None) is None:
@@ -1168,6 +1178,7 @@ class MainWindow(QMainWindow):
         self.restart_btn.hide()
         self.calib_btn.setEnabled(True)
         self.learn_btn.setChecked(False)
+        self._update_input_banner()  # restore the normal banner state
         for v in self.views.values():
             v.set_selected(None)
         self._set_status(
@@ -1213,17 +1224,21 @@ class MainWindow(QMainWindow):
             self._focus_device(device_id)
         learn = getattr(self, "_learn", None)
         if view.learn_mode and learn and learn.get("is_axis"):
-            # Capture the axis the user SWEEPS through a wide range — not just any
-            # axis that reads high. An uncentered axis sitting at an extreme, or a
-            # small cross-coupling nudge on pitch while you roll, barely moves, so
-            # it can't be grabbed by mistake (fixes "rolling jumps to pitch").
-            rng = learn["axis_range"].setdefault(index, [value, value])
-            rng[0] = min(rng[0], value)
-            rng[1] = max(rng[1], value)
-            if rng[1] - rng[0] > 0.8:
-                imap.learn_axis(index, learn["control"])
+            # Capture the axis the user SWEEPS the most — track each axis's range
+            # and take the clear leader. This ignores an axis parked at an extreme
+            # or small cross-coupling (fixes "rolling jumps to pitch") while still
+            # working for axes that don't sweep the full -1..1 (0.5 is enough).
+            ranges = learn["axis_range"]
+            r = ranges.setdefault(index, [value, value])
+            r[0] = min(r[0], value)
+            r[1] = max(r[1], value)
+            spans = {i: hi - lo for i, (lo, hi) in ranges.items()}
+            lead = max(spans, key=spans.get)
+            others = [s for i, s in spans.items() if i != lead]
+            if spans[lead] > 0.5 and spans[lead] >= max(others, default=0.0) + 0.3:
+                imap.learn_axis(lead, learn["control"])
                 save_maps(self.maps)
-                self.status.setText(f"Learned {learn['control']} → axis {index} (saved)")
+                self.status.setText(f"Learned {learn['control']} → axis {lead} (saved)")
                 self._learn = None
                 self._after_capture()
         control = imap.control_for_axis(index)
@@ -1270,6 +1285,7 @@ class MainWindow(QMainWindow):
             self.skip_btn.hide()
             self.restart_btn.hide()
             self.calib_btn.setEnabled(True)
+            self._update_input_banner()
         if not self._calib:
             self.status.setText(
                 "Learn mode: click a control on the diagram, then press the real input(s) it prompts for."

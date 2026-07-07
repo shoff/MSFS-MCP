@@ -152,16 +152,25 @@ class HidAxisDevice:
 
 
 def find_for_device(usb_ids, match_names) -> dict | None:
-    """Find a HID game device matching a DeviceProfile (by USB id, vendor, or
-    product name) — used to pick up gear SDL couldn't enumerate."""
+    """Find a HID device matching a DeviceProfile (by USB id, vendor, or product
+    name) — used to pick up gear SDL couldn't enumerate.
+
+    A USB id / vendor match is trusted regardless of the reported HID usage page
+    (that's the whole point — SDL skipped it because of an odd usage page). The
+    name heuristic is only used as a looser fallback for game-like devices.
+    """
     vendors = {vid for vid, _pid in usb_ids}
     norm_names = ["".join(ch for ch in n.lower() if ch.isalnum()) for n in match_names]
-    for h in enumerate_devices():
+    devices = enumerate_devices()
+    # 1) trust an exact USB id or vendor match, whatever the usage page says
+    for h in devices:
+        if (h["vid"], h["pid"]) in usb_ids or (h["vid"] and h["vid"] in vendors):
+            return h
+    # 2) fall back to product-name match on game-like devices
+    for h in devices:
         if not h["looks_game"]:
             continue
-        if (h["vid"], h["pid"]) in usb_ids or h["vid"] in vendors:
-            return h
         prod = "".join(ch for ch in (h["product"] or "").lower() if ch.isalnum())
-        if prod and any(n in prod for n in norm_names):
+        if prod and any(n and n in prod for n in norm_names):
             return h
     return None

@@ -32,10 +32,14 @@ if not exist ".venv\Scripts\python.exe" (
 call ".venv\Scripts\activate.bat"
 
 REM -------------------------------------------- 2) ensure requirements installed
-REM The marker file is written only after a successful install, so a half-finished
-REM or failed first install is retried on the next run instead of being skipped.
-if not exist ".venv\.deps-installed" (
-    echo Installing the controls app and its requirements ^(first run only^)...
+REM The marker records the dependency version. Bump DEP_VERSION whenever the
+REM requirements change (e.g. hidapi added) so existing installs re-run pip
+REM instead of being skipped by a stale marker.
+set "DEP_VERSION=3"
+set "INSTALLED_VER="
+if exist ".venv\.deps-installed" set /p INSTALLED_VER=<".venv\.deps-installed"
+if not "%INSTALLED_VER%"=="%DEP_VERSION%" (
+    echo Installing/updating the controls app and its requirements...
     python -m pip install --upgrade pip
     pip install -e ".[controls,openai]"
     if errorlevel 1 (
@@ -45,7 +49,7 @@ if not exist ".venv\.deps-installed" (
         pause
         exit /b 1
     )
-    echo installed > ".venv\.deps-installed"
+    echo %DEP_VERSION%> ".venv\.deps-installed"
 )
 
 REM -------------------------------------------------------------------- Launch
