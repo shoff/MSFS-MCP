@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
@@ -10,6 +12,27 @@ from .devices import DEVICES, vid_pid_from_guid
 
 POLL_MS = 33  # ~30 Hz
 AXIS_EPSILON = 0.01
+
+# Manual device assignments persist here, keyed by the joystick *name* SDL
+# reports (indices shuffle between sessions; the name is stable), so a device
+# the app can't auto-detect stays assigned across launches.
+ASSIGN_PATH = Path.home() / ".msfs_companion" / "device_assignments.json"
+
+
+def _load_assignments() -> dict[str, str]:
+    try:
+        data = json.loads(ASSIGN_PATH.read_text(encoding="utf-8"))
+        return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_assignments(data: dict[str, str]) -> None:
+    try:
+        ASSIGN_PATH.parent.mkdir(parents=True, exist_ok=True)
+        ASSIGN_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except OSError:
+        pass
 
 
 class InputMonitor(QObject):
@@ -30,7 +53,7 @@ class InputMonitor(QObject):
         self._pygame = None
         self._sticks: dict[str, object] = {}     # device_id -> pygame joystick
         self._state: dict[str, dict] = {}        # device_id -> {buttons: [], axes: [], hats: []}
-        self._manual: dict[str, int] = {}        # device_id -> forced joystick index
+        self._manual: dict[str, str] = _load_assignments()  # device_id -> joystick name
         self.available = False
         self._timer = QTimer(self)
         self._timer.setInterval(POLL_MS)
@@ -89,11 +112,13 @@ class InputMonitor(QObject):
             sticks[i] = stick
 
         used: set[int] = set()
-        # 1) manual overrides first
-        for device_id, idx in self._manual.items():
-            if idx in sticks and idx not in used:
-                self._bind(device_id, sticks[idx])
-                used.add(idx)
+        # 1) manual overrides first (matched by the joystick's stable name)
+        for device_id, want_name in self._manual.items():
+            for i, stick in sticks.items():
+                if i not in used and stick.get_name() == want_name:
+                    self._bind(device_id, stick)
+                    used.add(i)
+                    break
         # 2) automatic name / USB-id matching for the rest
         for i, stick in sticks.items():
             if i in used:
@@ -111,13 +136,14 @@ class InputMonitor(QObject):
         detected = {d.id: (d.always_present or d.id in self._sticks) for d in DEVICES}
         self.devices_changed.emit(detected)
 
-    def assign(self, device_id: str, joystick_index: int | None) -> None:
-        """Force a physical joystick (by index) to drive a device slot, or pass
-        None to clear the override. Takes effect immediately."""
-        if joystick_index is None:
+    def assign(self, device_id: str, joystick_name: str | None) -> None:
+        """Force a physical joystick (by its SDL name) to drive a device slot,
+        or pass None to clear. Persists across launches and takes effect now."""
+        if joystick_name is None:
             self._manual.pop(device_id, None)
         else:
-            self._manual[device_id] = joystick_index
+            self._manual[device_id] = joystick_name
+        _save_assignments(self._manual)
         self.rescan()
 
     def raw_snapshot(self) -> list[dict]:
@@ -144,9 +170,9 @@ class InputMonitor(QObject):
                      if not d.always_present and d.matches(name, vid, pid)),
                     None,
                 )
-                # honor a manual override in what we report as matched
-                for dev_id, idx in self._manual.items():
-                    if idx == i:
+                # honor a manual override (by name) in what we report as matched
+                for dev_id, nm in self._manual.items():
+                    if nm == name:
                         matched = dev_id
                 out.append({
                     "index": i, "name": name, "guid": guid, "vid": vid, "pid": pid,

@@ -459,12 +459,18 @@ class DiagnosticsDialog(QDialog):
 
     def _populate_combos(self) -> None:
         snap = self.monitor.raw_snapshot()
-        for combo in self.assign_combos.values():
+        current = self.monitor._manual  # device_id -> assigned joystick name
+        for device_id, combo in self.assign_combos.items():
             combo.blockSignals(True)
             combo.clear()
             combo.addItem("Auto (detect by name)", None)
             for js in snap:
-                combo.addItem(f"Joystick {js['index']}: {js['name']}", js["index"])
+                combo.addItem(f"Joystick {js['index']}: {js['name']}", js["name"])
+            want = current.get(device_id)
+            if want is not None:
+                i = combo.findData(want)
+                if i >= 0:
+                    combo.setCurrentIndex(i)
             combo.blockSignals(False)
 
     def _refresh(self) -> None:
