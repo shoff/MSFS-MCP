@@ -163,7 +163,7 @@ class DeviceView(QWidget):
             pen = QPen(accent if on else border, 2 if on else 1.2)
             if el.id in self.calibrated:                 # calibrated -> solid green, stays
                 pen = QPen(QColor(theme.GREEN), 2)
-            if self.learn_mode and self.selected == el.id:   # being calibrated NOW -> amber
+            if self.selected == el.id:                   # selected / being calibrated -> amber
                 pen = QPen(QColor(theme.AMBER), 2, Qt.PenStyle.DashLine)
             p.setPen(pen)
 

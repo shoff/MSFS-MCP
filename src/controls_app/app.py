@@ -806,6 +806,20 @@ class MainWindow(QMainWindow):
         self.restart_btn.clicked.connect(self._calib_restart)
         self.restart_btn.hide()
         title_row.addWidget(self.restart_btn)
+        self.accept_btn = QToolButton()
+        self.accept_btn.setText("✓ Accept ▸")
+        self.accept_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.accept_btn.setToolTip("Accept this control's capture and move to the next")
+        self.accept_btn.clicked.connect(self._calib_accept)
+        self.accept_btn.hide()
+        title_row.addWidget(self.accept_btn)
+        self.redo_btn = QToolButton()
+        self.redo_btn.setText("↻ Redo")
+        self.redo_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.redo_btn.setToolTip("Re-capture this control")
+        self.redo_btn.clicked.connect(self._calib_redo)
+        self.redo_btn.hide()
+        title_row.addWidget(self.redo_btn)
         rescan = QToolButton()
         rescan.setText("⟳ Rescan")
         rescan.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -1155,7 +1169,15 @@ class MainWindow(QMainWindow):
     def _learn_active(self, control_id: str) -> bool:
         return getattr(self, "_learn", None) is not None and self._learn["control"] == control_id
 
-    # -- guided calibration: walk every control on the device once ---------
+    def _calib_buttons(self, mode: str) -> None:
+        """Show the right calibration buttons for the current phase.
+        mode: 'capture' (operating a control) | 'confirm' (accept/redo) | 'off'."""
+        self.skip_btn.setVisible(mode == "capture")
+        self.accept_btn.setVisible(mode == "confirm")
+        self.redo_btn.setVisible(mode == "confirm")
+        self.restart_btn.setVisible(mode in ("capture", "confirm"))
+
+    # -- guided calibration: walk the device's controls (or just one) ------
     def _start_calibration(self) -> None:
         device_id = self._current_device_id()
         if not device_id or device_id == "keyboard_mouse":
@@ -1164,15 +1186,19 @@ class MainWindow(QMainWindow):
                 "Select the Alpha, Bravo or rudder pedals in the sidebar first, then Calibrate.",
             )
             return
-        controls = [c.id for c in DEVICE_BY_ID[device_id].inputs]
+        # If a single control on this device is selected, calibrate JUST that one.
+        sel = getattr(self, "_selected_control", None)
+        single = sel[1] if sel and sel[0] == device_id else None
+        self._selected_control = None
+        controls = [single] if single else [c.id for c in DEVICE_BY_ID[device_id].inputs]
         if not controls:
             return
-        self._calib = {"device": device_id, "order": controls, "idx": -1}
-        self.views[device_id].clear_calibrated()   # fresh run: no green until re-done
+        self._calib = {"device": device_id, "order": controls, "idx": -1, "single": bool(single)}
+        if not single:
+            self.views[device_id].clear_calibrated()   # full run: no green until re-done
         if self.rawview_btn.isChecked():
             self.rawview_btn.setChecked(False)  # show the diagram so highlights are visible
-        self.skip_btn.show()
-        self.restart_btn.show()
+        self._calib_buttons("capture")
         self.calib_btn.setEnabled(False)
         self.learn_btn.setChecked(True)  # enables the capture gate
         self._calib_next()
@@ -1205,10 +1231,12 @@ class MainWindow(QMainWindow):
         calib = getattr(self, "_calib", None)
         if calib is None:
             return
+        self._calib_pending = None
         calib["idx"] += 1
         if calib["idx"] >= len(calib["order"]):
             self._finish_calibration()
             return
+        self._calib_buttons("capture")
         device_id, control_id = calib["device"], calib["order"][calib["idx"]]
         self.views[device_id].set_selected(control_id)
         # Capture stays OFF until the control actually starts (see _calib_begin),
@@ -1257,24 +1285,72 @@ class MainWindow(QMainWindow):
         if getattr(self, "_calib", None) is None:
             return
         self._learn = None
+        self._calib_pending = None
         self._calib_next()
 
     def _after_capture(self) -> None:
-        if getattr(self, "_calib", None) is not None:
-            QTimer.singleShot(300, self._calib_next)
+        # A capture just completed. Don't auto-advance — wait for the user to
+        # Accept (or Redo) so they can confirm it grabbed the right control.
+        calib = getattr(self, "_calib", None)
+        if calib is None:
+            return
+        control_id = calib["order"][calib["idx"]]
+        QTimer.singleShot(150, lambda: self._show_accept(control_id))
+
+    def _capture_summary(self, device_id: str, control_id: str) -> str:
+        imap = self.maps[device_id]
+        kind = self._control_kind(device_id, control_id)
+        if kind in ("axis", "lever"):
+            return f"axis {imap.axis_for_control(control_id)}"
+        if kind == "hat":
+            hats = [i for i, c in imap.hats.items() if c == control_id]
+            return f"hat {hats[0] if hats else '?'}"
+        return f"button(s) {imap.buttons_for_control(control_id)}"
+
+    def _show_accept(self, control_id: str) -> None:
+        calib = getattr(self, "_calib", None)
+        if calib is None or calib["order"][calib["idx"]] != control_id:
+            return
+        self._calib_pending = control_id
+        device_id = calib["device"]
+        label = next((c.label for c in DEVICE_BY_ID[device_id].inputs if c.id == control_id), control_id)
+        got = self._capture_summary(device_id, control_id)
+        self._calib_buttons("confirm")
+        self._calib_banner(f"✓ Captured {label} → {got}.  ✓ Accept ▸ to continue, or ↻ Redo")
+        self._set_status(f"Captured {label} → {got}. Accept to continue, or Redo if wrong.", theme.GREEN)
+
+    def _calib_accept(self) -> None:
+        if getattr(self, "_calib_pending", None) is None:
+            return
+        self._calib_pending = None
+        self._calib_buttons("capture")
+        self._calib_next()
+
+    def _calib_redo(self) -> None:
+        pending = getattr(self, "_calib_pending", None)
+        calib = getattr(self, "_calib", None)
+        if pending is None or calib is None:
+            return
+        self._calib_pending = None
+        # Un-mark it (border back to amber) and re-open capture immediately.
+        self.views[calib["device"]].set_calibrated(pending, done=False)
+        self._calib_buttons("capture")
+        self._calib_begin(pending)
 
     def _finish_calibration(self) -> None:
+        single = bool(self._calib and self._calib.get("single"))
         self._calib = None
         self._learn = None
-        self.skip_btn.hide()
-        self.restart_btn.hide()
+        self._calib_pending = None
+        self._calib_buttons("off")
         self.calib_btn.setEnabled(True)
         self.learn_btn.setChecked(False)
         self._update_input_banner()  # restore the normal banner state
         for v in self.views.values():
             v.set_selected(None)
         self._set_status(
-            "✓ Calibration saved — the diagram and MSFS writes now use your real controls.",
+            ("✓ Control calibrated." if single else
+             "✓ Calibration saved — the diagram and MSFS writes now use your real controls."),
             theme.GREEN,
         )
 
@@ -1372,15 +1448,25 @@ class MainWindow(QMainWindow):
         if not isinstance(view, DeviceView):
             return
         if not view.learn_mode:
-            # Outside calibration: click a switch to flip its SHOWN position so the
-            # picture matches the real, maintained switch (the app can't know a
-            # switch's rest state, and some read backward). Display-only sync.
-            kind = self._control_kind(view.device_id, control_id)
-            if kind in SWITCH_KINDS:
+            dev = view.device_id
+            kind = self._control_kind(dev, control_id)
+            already = getattr(self, "_selected_control", None) == (dev, control_id)
+            if already and kind in SWITCH_KINDS:
+                # Second click on the already-selected switch: flip its SHOWN
+                # position so the picture matches the real switch (display sync).
                 new = view.toggle_switch(control_id)
                 names = ({1: "RIGHT", -1: "LEFT", 0: "centered"} if kind == "switch3h"
                          else {1: "UP / forward", -1: "DOWN / back", 0: "centered"})
-                self._set_status(f"{control_id}: shown as {names[new]} (click to flip)", theme.ACCENT)
+                self._set_status(f"{control_id}: shown as {names[new]} (click again to flip)", theme.ACCENT)
+            else:
+                # Select this control; clicking 🧭 Calibrate now does JUST this one.
+                self._selected_control = (dev, control_id)
+                view.set_selected(control_id)
+                label = next((c.label for c in DEVICE_BY_ID[dev].inputs if c.id == control_id), control_id)
+                self._set_status(
+                    f"Selected {label} — click 🧭 Calibrate to calibrate just this control.",
+                    theme.ACCENT,
+                )
             return
         if getattr(self, "_calib", None) is not None:
             self._calib_jump(control_id)   # click a control to (re)calibrate it
@@ -1472,8 +1558,8 @@ class MainWindow(QMainWindow):
         # Turning Learn off aborts a calibration run in progress.
         if not on and getattr(self, "_calib", None) is not None:
             self._calib = None
-            self.skip_btn.hide()
-            self.restart_btn.hide()
+            self._calib_pending = None
+            self._calib_buttons("off")
             self.calib_btn.setEnabled(True)
             self._update_input_banner()
         if not self._calib:
