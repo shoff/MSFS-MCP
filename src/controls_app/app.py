@@ -626,11 +626,23 @@ class MainWindow(QMainWindow):
         return header
 
     # ------------------------------------------------------------ main pane
+    FLOW_STEPS = ["① Pick aircraft", "② AI builds your setup", "③ ⭳ Write to MSFS", "④ ▶ Verify live"]
+
     def _build_main_pane(self) -> QWidget:
         pane = QWidget(objectName="Root")
         lay = QVBoxLayout(pane)
         lay.setContentsMargins(16, 12, 16, 10)
         lay.setSpacing(8)
+
+        # Always-visible guide so it's clear what to do and in what order.
+        self.flow = QLabel()
+        self.flow.setTextFormat(Qt.TextFormat.RichText)
+        self.flow.setStyleSheet(
+            f"background: {theme.PANEL}; border: 1px solid {theme.BORDER}; "
+            "border-radius: 6px; padding: 6px 10px; font-size: 12px;"
+        )
+        lay.addWidget(self.flow)
+        self._update_flow(2)
 
         title_row = QHBoxLayout()
         self.device_title = QLabel(objectName="SectionTitle")
@@ -902,6 +914,16 @@ class MainWindow(QMainWindow):
                 view.pulse("mouse")
         return super().eventFilter(obj, event)
 
+    # ------------------------------------------------------------------ flow
+    def _update_flow(self, active: int) -> None:
+        parts = []
+        for i, label in enumerate(self.FLOW_STEPS, 1):
+            if i == active:
+                parts.append(f"<b style='color:{theme.ACCENT}'>{label}</b>")
+            else:
+                parts.append(f"<span style='color:{theme.TEXT_DIM}'>{label}</span>")
+        self.flow.setText("&nbsp;&nbsp;→&nbsp;&nbsp;".join(parts))
+
     # ---------------------------------------------------------------- status
     def _set_status(self, text: str, color: str | None = None) -> None:
         """Update the footer status line, optionally in a state color."""
@@ -969,6 +991,7 @@ class MainWindow(QMainWindow):
     def _on_plan_ready(self, plan: ControlPlan) -> None:
         self.plans[plan.aircraft_key] = plan
         self._reset_ask_button()
+        self._update_flow(3)  # setup built -> next is Write to MSFS
         if plan.aircraft_key == self._current_aircraft_key():
             self.plan = plan
             self._refresh_views()
@@ -1015,6 +1038,7 @@ class MainWindow(QMainWindow):
                 f"✓ Written to MSFS — {summary}. Restart MSFS (or reselect the profile in "
                 f"Options → Controls) to load it.", theme.GREEN,
             )
+            self._update_flow(4)  # written -> optionally Verify live
         elif wrote:
             self._set_status(
                 f"✓ Wrote {len(wrote)} device(s); {len(failed)} need attention — see the dialog.",
