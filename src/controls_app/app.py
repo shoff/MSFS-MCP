@@ -502,6 +502,16 @@ class DiagnosticsDialog(QDialog):
                 f"{len(js['axes'])} axes · {js['num_buttons']} buttons</span><br>"
                 f"axes: {axes}<br>buttons pressed: {btns}</p>"
             )
+        seen_ids = {js["matched"] for js in snap if js["matched"]}
+        missing = [label for did, label in self.BINDABLE if did not in seen_ids]
+        if missing:
+            blocks.append(
+                f"<p style='color:{theme.AMBER}'>Not seen by the app: <b>{', '.join(missing)}</b>. "
+                "If a device works in Windows but isn’t listed above, the input library can’t read "
+                "it yet. Try, in the app folder: <b>.venv\\Scripts\\pip install -U pygame</b> and "
+                "reopen; if it still doesn’t appear, set the environment variable "
+                "<b>MSFS_COMPANION_SDL_HIDAPI=0</b> (forces DirectInput) and reopen.</p>"
+            )
         self.view.setHtml("".join(blocks))
 
     def done(self, result: int) -> None:  # noqa: N802

@@ -160,6 +160,23 @@ def vid_pid_from_guid(guid: str | None) -> tuple[int | None, int | None]:
     return vendor, product
 
 
+def set_sdl_hints() -> None:
+    """Set SDL joystick hints — MUST run before the first pygame.init().
+
+    - background events: read the sticks while MSFS holds foreground focus.
+    - HIDAPI off (opt-in via env): some pedals/wheels (e.g. certain Turtle Beach
+      units) are only enumerated through DirectInput; SDL's HIDAPI driver can
+      hide them. Set MSFS_COMPANION_SDL_HIDAPI=0 to force DirectInput.
+    """
+    import os
+
+    os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
+    os.environ.setdefault("SDL_JOYSTICK_THREAD", "1")
+    hidapi = os.environ.get("MSFS_COMPANION_SDL_HIDAPI")
+    if hidapi is not None:
+        os.environ.setdefault("SDL_JOYSTICK_HIDAPI", hidapi)
+
+
 def detect_connected() -> dict[str, bool]:
     """Return {device_id: detected} using pygame's joystick list if available.
 
@@ -172,6 +189,7 @@ def detect_connected() -> dict[str, bool]:
         import os
 
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        set_sdl_hints()
         import pygame
 
         pygame.init()

@@ -24,7 +24,7 @@ dev = ["pytest>=8.0", "ruff>=0.4"]
 # (The 'fsuipc' PyPI package tops out at 1.x — there is no 2.x.)
 transports = ["fsuipc>=1.3", "pymem>=1.13.1"]
 checklist = ["PyQt6>=6.6", "anthropic>=0.40"]
-controls = ["PyQt6>=6.6", "anthropic>=0.40", "pygame>=2.5"]
+controls = ["PyQt6>=6.6", "anthropic>=0.40", "pygame>=2.6"]
 # For MSFS_COMPANION_LLM=openai or =local (Ollama / LM Studio / llama.cpp, all
 # OpenAI-compatible). The anthropic provider (default) does not need this.
 openai = ["openai>=1.30"]

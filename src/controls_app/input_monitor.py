@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from .devices import DEVICES, vid_pid_from_guid
+from .devices import DEVICES, set_sdl_hints, vid_pid_from_guid
 
 POLL_MS = 33  # ~30 Hz
 AXIS_EPSILON = 0.01
@@ -63,6 +63,7 @@ class InputMonitor(QObject):
     def start(self) -> None:
         try:
             os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+            set_sdl_hints()
             import pygame
 
             pygame.init()
