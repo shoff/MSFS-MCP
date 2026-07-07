@@ -56,6 +56,7 @@ class VerifyDialog(QDialog):
         self.idx = -1
         self.baseline: float | None = None
         self.sim_live = False
+        self.sim_settled_offline = False  # True once a connect attempt has concluded
 
         self.setWindowTitle(f"Verify bindings live — {device.name}")
         self.resize(720, 600)
@@ -72,6 +73,19 @@ class VerifyDialog(QDialog):
         self.sub.setWordWrap(True)
         self.sub.setStyleSheet(f"color: {theme.TEXT_DIM}; font-size: 12px;")
         lay.addWidget(self.sub)
+
+        # Live feedback so the screen never looks dead: sim link state + the last
+        # raw input we saw from this device (proves input is arriving even if it
+        # isn't the control being tested — the #1 "nothing happens" confusion).
+        self.simchip = QLabel()
+        self.simchip.setStyleSheet("font-size: 11px;")
+        lay.addWidget(self.simchip)
+        self._update_simchip()
+        self.raw = QLabel("Waiting for input — move a control on this device…")
+        self.raw.setStyleSheet(
+            f"color: {theme.TEXT_FAINT}; font-size: 11px; font-family: Consolas, monospace;"
+        )
+        lay.addWidget(self.raw)
 
         self.table = QTableWidget(len(self.tests), 4)
         self.table.setHorizontalHeaderLabels(["CONTROL", "WATCHING SIMVAR", "HW / SIM", "RESULT"])
@@ -120,11 +134,12 @@ class VerifyDialog(QDialog):
         self.advance_timer = QTimer(self)
         self.advance_timer.setSingleShot(True)
         self.advance_timer.timeout.connect(self._advance)
-        self.sim_settled_offline = False  # True once a connect attempt has failed
 
-        # hardware channel
+        # hardware channel (test matching + an always-on raw readout)
         self.monitor.button_changed.connect(self._on_button)
         self.monitor.axis_changed.connect(self._on_axis)
+        self.monitor.button_changed.connect(self._on_raw_button)
+        self.monitor.axis_changed.connect(self._on_raw_axis)
 
         # sim channel (own link so the watch set is ours)
         self.sim = SimLink(self)
@@ -230,12 +245,39 @@ class VerifyDialog(QDialog):
             self._paint_row(self.idx)
             self._maybe_pass()
 
+    # -------- always-on raw readout (independent of the current test) --------
+    def _on_raw_axis(self, device_id: str, index: int, value: float) -> None:
+        if device_id != self.device_id:
+            return
+        mapped = self.input_map.control_for_axis(index)
+        who = f" → {mapped}" if mapped else " (unmapped — use Learn)"
+        self.raw.setText(f"input seen:  axis {index} = {value:+.2f}{who}")
+
+    def _on_raw_button(self, device_id: str, index: int, pressed: bool) -> None:
+        if device_id != self.device_id or not pressed:
+            return
+        mapped = self.input_map.control_for_button(index)
+        who = f" → {mapped}" if mapped else " (unmapped — use Learn)"
+        self.raw.setText(f"input seen:  button {index}{who}")
+
+    def _update_simchip(self) -> None:
+        if self.sim_live:
+            self.simchip.setText("● Sim: LIVE — checking the binding actually reaches MSFS")
+            self.simchip.setStyleSheet(f"color: {theme.GREEN}; font-size: 11px;")
+        elif self.sim_settled_offline:
+            self.simchip.setText("● Sim: offline — hardware-only check (start MSFS + load a flight for the full test)")
+            self.simchip.setStyleSheet(f"color: {theme.AMBER}; font-size: 11px;")
+        else:
+            self.simchip.setText("● Sim: connecting…")
+            self.simchip.setStyleSheet(f"color: {theme.TEXT_DIM}; font-size: 11px;")
+
     def _on_sim_state(self, state: str) -> None:
         self.sim_live = state == STATE_LIVE
         if state == STATE_OFFLINE:
             self.sim_settled_offline = True   # a connect attempt has concluded
         elif state == STATE_LIVE:
             self.sim_settled_offline = False  # link recovered
+        self._update_simchip()
         t = self.current()
         if t is not None:
             self.sub.setText(
@@ -278,11 +320,16 @@ class VerifyDialog(QDialog):
 
     # ------------------------------------------------------------- teardown
     def done(self, result: int) -> None:  # noqa: N802
-        try:
-            self.monitor.button_changed.disconnect(self._on_button)
-            self.monitor.axis_changed.disconnect(self._on_axis)
-        except TypeError:
-            pass
+        for sig, slot in (
+            (self.monitor.button_changed, self._on_button),
+            (self.monitor.axis_changed, self._on_axis),
+            (self.monitor.button_changed, self._on_raw_button),
+            (self.monitor.axis_changed, self._on_raw_axis),
+        ):
+            try:
+                sig.disconnect(slot)
+            except TypeError:
+                pass
         self.sim.stop()
         self.sim.wait(2000)
         super().done(result)

@@ -70,16 +70,27 @@ def _install_fake_openai(monkeypatch, captured, *, content='{"ok": true}', refus
     class APIConnectionError(Exception):
         pass
 
+    class BadRequestError(Exception):
+        pass
+
     mod.AuthenticationError = AuthenticationError
     mod.APIConnectionError = APIConnectionError
+    mod.BadRequestError = BadRequestError
 
     class _Completions:
         def create(self, **kwargs):
             captured.update(kwargs)
+            captured["_last_create"] = dict(kwargs)  # just this call's kwargs
             if raise_kind == "auth":
                 raise AuthenticationError("bad key")
             if raise_kind == "conn":
                 raise APIConnectionError("no server")
+            # emulate a newer OpenAI model rejecting max_tokens
+            if raise_kind == "token" and "max_tokens" in kwargs:
+                raise BadRequestError(
+                    "Unsupported parameter: 'max_tokens' is not supported with this model. "
+                    "Use 'max_completion_tokens' instead."
+                )
             msg = types.SimpleNamespace(content=content, refusal=refusal)
             return types.SimpleNamespace(choices=[types.SimpleNamespace(message=msg)])
 
@@ -108,6 +119,19 @@ def test_local_provider_hits_localhost_with_json_object(monkeypatch):
     assert captured["response_format"] == {"type": "json_object"}
     # the schema is pinned into the system prompt for schema-agnostic servers
     assert "JSON Schema" in captured["messages"][0]["content"]
+
+
+def test_token_param_fallback_for_newer_models(monkeypatch):
+    # A model that rejects max_tokens and demands max_completion_tokens must be
+    # handled transparently (this is the "Error code: 400 ... use
+    # max_completion_tokens" the user hit).
+    monkeypatch.setenv("MSFS_COMPANION_LLM", "local")  # prefers max_tokens first
+    captured = {}
+    _install_fake_openai(monkeypatch, captured, content='{"ok": true}', raise_kind="token")
+    out = llm.call_json(system="s", user="u", schema={"type": "object"}, error_cls=Boom)
+    assert out == {"ok": True}
+    last = captured["_last_create"]
+    assert "max_completion_tokens" in last and "max_tokens" not in last
 
 
 def test_openai_provider_uses_strict_json_schema(monkeypatch):

@@ -173,20 +173,26 @@ def _call_openai_compatible(system, user, schema, error_cls, no_credentials_msg,
         system_msg = system + "\n\n" + _schema_instruction(schema)
         response_format = {"type": "json_object"}
 
+    base_kwargs = dict(
+        model=model(),
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user},
+        ],
+        response_format=response_format,
+    )
+    # Newer OpenAI models reject `max_tokens` and require `max_completion_tokens`;
+    # older ones and most local servers want `max_tokens`. Prefer the right one
+    # per provider and fall back to the other if the API asks for it.
+    prefer = "max_completion_tokens" if p == "openai" else "max_tokens"
     try:
-        response = client.chat.completions.create(
-            model=model(),
-            max_tokens=max_tokens,
-            messages=[
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user},
-            ],
-            response_format=response_format,
-        )
+        response = _create_with_token_fallback(client, openai, base_kwargs, max_tokens, prefer)
     except openai.AuthenticationError as exc:
         raise error_cls("The LLM API key was rejected — check OPENAI_API_KEY.") from exc
     except openai.APIConnectionError as exc:
         raise error_cls(_connection_msg(p, base_url)) from exc
+    except openai.BadRequestError as exc:
+        raise error_cls(f"The model rejected the request: {exc}") from exc
 
     choice = response.choices[0]
     if getattr(choice.message, "refusal", None):
@@ -195,6 +201,23 @@ def _call_openai_compatible(system, user, schema, error_cls, no_credentials_msg,
     if not content:
         raise error_cls("The model returned an empty response.")
     return _extract_json(content, error_cls)
+
+
+def _create_with_token_fallback(client, openai, base_kwargs, max_tokens, prefer):
+    """Call chat.completions with the preferred token-limit parameter, retrying
+    once with the other name if the model reports it as unsupported."""
+    other = "max_completion_tokens" if prefer == "max_tokens" else "max_tokens"
+    kwargs = dict(base_kwargs)
+    kwargs[prefer] = max_tokens
+    try:
+        return client.chat.completions.create(**kwargs)
+    except openai.BadRequestError as exc:
+        msg = str(exc).lower()
+        if other in msg and ("unsupported" in msg or "not supported" in msg or "instead" in msg):
+            kwargs.pop(prefer, None)
+            kwargs[other] = max_tokens
+            return client.chat.completions.create(**kwargs)
+        raise
 
 
 def _schema_instruction(schema: dict) -> str:
