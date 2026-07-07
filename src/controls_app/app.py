@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -43,7 +44,7 @@ from companion_common import llm, theme
 
 from . import advisor, msfs_profiles
 from .bindings import ControlPlan, load_default_plans
-from .device_views import DeviceView, build_views
+from .device_views import DeviceView, RawDeviceView, build_views
 from .devices import DEVICE_BY_ID, DEVICES, detect_connected
 from .input_map import InputMap, load_maps, save_maps
 from .input_monitor import InputMonitor
@@ -532,6 +533,8 @@ class MainWindow(QMainWindow):
         self._ask_ticks = 0
         self._ask_auto = False
         self._calib = None               # active guided-calibration sequence
+        self._raw_mode = False           # accurate device-read panel vs diagram
+        self.raw_views: dict[str, RawDeviceView] = {}
         self._ai_done: set[str] = set()  # aircraft already auto-set-up this session
         self._written: set[str] = set()  # aircraft already auto-written this session
         self._write_worker: AutoWriteWorker | None = None
@@ -576,6 +579,15 @@ class MainWindow(QMainWindow):
         self.monitor.devices_changed.connect(self._on_devices_changed)
         self.monitor.start()
         self._update_input_banner()  # tell the user immediately if we see no hardware
+
+        # accurate device-read panels (real axis/button counts from SDL)
+        for did in ("honeycomb_alpha", "honeycomb_bravo", "velocityone_rudder"):
+            rv = RawDeviceView(did, self.monitor,
+                               lambda kind, i, d=did: self._raw_label(d, kind, i))
+            rv.element_clicked.connect(lambda key, d=did: self._on_raw_clicked(d, key))
+            self.raw_views[did] = rv
+            self.view_stack.addWidget(rv)
+
         QApplication.instance().installEventFilter(self)
 
         # make sure the shared MCP server is up (detached; survives app close)
@@ -686,6 +698,16 @@ class MainWindow(QMainWindow):
         )
         self.learn_btn.toggled.connect(self._on_learn_toggle)
         title_row.addWidget(self.learn_btn)
+        self.rawview_btn = QToolButton()
+        self.rawview_btn.setText("🎛 Raw view")
+        self.rawview_btn.setCheckable(True)
+        self.rawview_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.rawview_btn.setToolTip(
+            "Show the device exactly as the app reads it from USB — the real number\n"
+            "of axes and buttons, live. Click a button/axis to assign what it does."
+        )
+        self.rawview_btn.toggled.connect(self._toggle_raw_view)
+        title_row.addWidget(self.rawview_btn)
         self.calib_btn = QToolButton()
         self.calib_btn.setText("🧭 Calibrate")
         self.calib_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -703,6 +725,13 @@ class MainWindow(QMainWindow):
         self.skip_btn.clicked.connect(self._calib_skip)
         self.skip_btn.hide()
         title_row.addWidget(self.skip_btn)
+        self.restart_btn = QToolButton()
+        self.restart_btn.setText("↺ Start over")
+        self.restart_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.restart_btn.setToolTip("Restart calibration from the first control")
+        self.restart_btn.clicked.connect(self._calib_restart)
+        self.restart_btn.hide()
+        title_row.addWidget(self.restart_btn)
         rescan = QToolButton()
         rescan.setText("⟳ Rescan")
         rescan.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -816,7 +845,8 @@ class MainWindow(QMainWindow):
         self.device_status.setText(
             f"{device.manufacturer} · " + ("connected" if on else "not detected — plan shown anyway")
         )
-        self.view_stack.setCurrentWidget(self.views[device_id])
+        raw = self._raw_mode and device_id in self.raw_views
+        self.view_stack.setCurrentWidget(self.raw_views[device_id] if raw else self.views[device_id])
 
         bindings = self.plan.devices.get(device_id, [])
         self.table.setRowCount(len(bindings))
@@ -844,6 +874,50 @@ class MainWindow(QMainWindow):
             f"<p><b style='color:{theme.AMBER}'>Aircraft notes:</b> {p.aircraft_notes}</p>"
             f"<p><b>Setup &amp; flying guide</b></p><ol>{steps}</ol>"
             f"<p>{legend} &nbsp;·&nbsp; <span style='color:{theme.TEXT_FAINT}'>plan source: {p.source}</span></p>"
+        )
+
+    # ------------------------------------------------- raw device-read panel
+    def _raw_label(self, device_id: str, kind: str, index: int) -> str | None:
+        imap = self.maps[device_id]
+        return imap.control_for_axis(index) if kind == "axis" else imap.control_for_button(index)
+
+    def _toggle_raw_view(self, on: bool) -> None:
+        self._raw_mode = on
+        self._refresh_views()
+
+    def _on_raw_clicked(self, device_id: str, key: str) -> None:
+        """Click a raw axis/button -> assign it a function (reverse mapping)."""
+        kind, _, idx_s = key.partition(":")
+        index = int(idx_s)
+        device = DEVICE_BY_ID[device_id]
+        want_axis = kind == "axis"
+        controls = [c for c in device.inputs
+                    if (c.kind in ("axis", "lever")) == want_axis]
+        menu = QMenu(self)
+        menu.addAction(f"{'Axis' if want_axis else 'Button'} {index} — assign to:").setEnabled(False)
+        menu.addSeparator()
+        for c in controls:
+            menu.addAction(c.label).setData(c.id)
+        clear = menu.addAction("(clear this input)")
+        clear.setData("__clear__")
+        chosen = menu.exec(self.cursor().pos())
+        if chosen is None:
+            return
+        imap = self.maps[device_id]
+        control_id = chosen.data()
+        if control_id == "__clear__":
+            control_id = None
+        if want_axis:
+            if control_id:
+                imap.learn_axis(index, control_id)
+        else:
+            if control_id:
+                imap.set_control_buttons(control_id, [index])
+        save_maps(self.maps)
+        self.raw_views[device_id].update()
+        self._set_status(
+            f"Assigned {kind} {index} → {control_id}" if control_id else "Cleared assignment",
+            theme.GREEN,
         )
 
     # ---------------------------------------------------------- live input
@@ -934,8 +1008,25 @@ class MainWindow(QMainWindow):
             return
         self._calib = {"device": device_id, "order": controls, "idx": -1}
         self.skip_btn.show()
+        self.restart_btn.show()
         self.calib_btn.setEnabled(False)
         self.learn_btn.setChecked(True)  # enables the capture gate
+        self._calib_next()
+
+    def _calib_restart(self) -> None:
+        if getattr(self, "_calib", None) is None:
+            return
+        self._learn = None
+        self._calib["idx"] = -1
+        self._calib_next()
+
+    def _calib_jump(self, control_id: str) -> None:
+        """Click a control on the diagram during calibration to (re)do that one."""
+        calib = getattr(self, "_calib", None)
+        if calib is None or control_id not in calib["order"]:
+            return
+        self._learn = None
+        calib["idx"] = calib["order"].index(control_id) - 1
         self._calib_next()
 
     def _calib_next(self) -> None:
@@ -967,6 +1058,7 @@ class MainWindow(QMainWindow):
         self._calib = None
         self._learn = None
         self.skip_btn.hide()
+        self.restart_btn.hide()
         self.calib_btn.setEnabled(True)
         self.learn_btn.setChecked(False)
         for v in self.views.values():
@@ -979,6 +1071,8 @@ class MainWindow(QMainWindow):
     def _on_button(self, device_id: str, index: int, pressed: bool) -> None:
         view, imap = self._view_and_map(device_id)
         self.raw_input.setText(f"{device_id}: button {index} {'▼' if pressed else '▲'}")
+        if device_id in self.raw_views:
+            self.raw_views[device_id].set_button(index, pressed)
         if pressed:
             self._focus_device(device_id)
         learn = getattr(self, "_learn", None)
@@ -1006,6 +1100,8 @@ class MainWindow(QMainWindow):
     def _on_axis(self, device_id: str, index: int, value: float) -> None:
         view, imap = self._view_and_map(device_id)
         self.raw_input.setText(f"{device_id}: axis {index} = {value:+.2f}")
+        if device_id in self.raw_views:
+            self.raw_views[device_id].set_axis(index, value)
         if abs(value) > 0.5:
             self._focus_device(device_id)
         learn = getattr(self, "_learn", None)
@@ -1029,9 +1125,13 @@ class MainWindow(QMainWindow):
 
     def _on_element_clicked(self, control_id: str) -> None:
         view = self.view_stack.currentWidget()
-        if isinstance(view, DeviceView) and view.learn_mode:
-            view.set_selected(control_id)
-            self._begin_capture(view.device_id, control_id)
+        if not isinstance(view, DeviceView) or not view.learn_mode:
+            return
+        if getattr(self, "_calib", None) is not None:
+            self._calib_jump(control_id)   # click a control to (re)calibrate it
+            return
+        view.set_selected(control_id)      # plain Learn: click then operate it
+        self._begin_capture(view.device_id, control_id)
 
     def _on_learn_toggle(self, on: bool) -> None:
         self._learn = None
@@ -1043,6 +1143,7 @@ class MainWindow(QMainWindow):
         if not on and getattr(self, "_calib", None) is not None:
             self._calib = None
             self.skip_btn.hide()
+            self.restart_btn.hide()
             self.calib_btn.setEnabled(True)
         if not self._calib:
             self.status.setText(

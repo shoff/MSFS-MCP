@@ -147,6 +147,18 @@ class InputMonitor(QObject):
         _save_assignments(self._manual)
         self.rescan()
 
+    def caps(self, device_id: str) -> tuple[int, int, int]:
+        """(axes, buttons, hats) the connected device actually reports, read
+        straight from SDL — so the UI can draw the real control count, not a
+        hardcoded guess. (0, 0, 0) if the device isn't currently bound."""
+        stick = self._sticks.get(device_id)
+        if stick is None:
+            return (0, 0, 0)
+        try:
+            return (stick.get_numaxes(), stick.get_numbuttons(), stick.get_numhats())
+        except Exception:
+            return (0, 0, 0)
+
     def raw_snapshot(self) -> list[dict]:
         """Live state of EVERY connected joystick, matched or not — the data the
         diagnostics view renders so the user can see what the app actually sees."""

@@ -72,8 +72,11 @@ def _spawn_detached(host: str, port: int) -> None:
         "close_fds": True,
     }
     if os.name == "nt":
+        # CREATE_NO_WINDOW: don't pop a console window for the background server.
+        # (DETACHED_PROCESS lets a console app allocate its own visible window —
+        # that's the "extra command window" nobody wants.)
         kwargs["creationflags"] = (
-            subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
+            subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
         )
     else:
         kwargs["start_new_session"] = True

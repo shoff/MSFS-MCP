@@ -290,3 +290,108 @@ def build_views() -> dict[str, DeviceView]:
         "velocityone_rudder": DeviceView("velocityone_rudder", *_rudder()),
         "keyboard_mouse": DeviceView("keyboard_mouse", *_keyboard_mouse()),
     }
+
+
+class RawDeviceView(QWidget):
+    """Accurate device panel read straight from SDL: one bar per real axis and
+    one light per real button, so the count ALWAYS matches the hardware (no
+    hardcoded guess). Live-updates as you operate controls; click a button/axis
+    to assign it a function. Mapped inputs get a green outline.
+    """
+
+    element_clicked = pyqtSignal(str)  # "btn:N" or "axis:N"
+
+    def __init__(self, device_id: str, monitor, label_fn):
+        super().__init__()
+        self.device_id = device_id
+        self.monitor = monitor
+        self.label_fn = label_fn          # (kind: str, index: int) -> str | None
+        self.axes: dict[int, float] = {}
+        self.pressed: set[int] = set()
+        self.learn_mode = False           # interface parity with DeviceView
+        self._hit: list[tuple[QRectF, str]] = []
+        self.setMinimumHeight(230)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    # driven by the monitor with RAW indices
+    def set_button(self, index: int, on: bool) -> None:
+        (self.pressed.add if on else self.pressed.discard)(index)
+        self.update()
+
+    def set_axis(self, index: int, value: float) -> None:
+        self.axes[index] = max(-1.0, min(1.0, value))
+        self.update()
+
+    def set_selected(self, _control_id) -> None:  # parity no-op
+        pass
+
+    def mousePressEvent(self, event):  # noqa: N802
+        pos = event.position()
+        for rect, key in self._hit:
+            if rect.contains(pos):
+                self.element_clicked.emit(key)
+                return
+        super().mousePressEvent(event)
+
+    def paintEvent(self, _event):  # noqa: N802
+        naxes, nbuttons, _nhats = self.monitor.caps(self.device_id)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.fillRect(self.rect(), QColor(theme.PANEL_ALT))
+        self._hit = []
+
+        if naxes == 0 and nbuttons == 0:
+            p.setPen(QColor(theme.TEXT_DIM))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                       "This device isn’t connected to the app.\n"
+                       "Open 🔎 Hardware to detect or assign it, then it appears here.")
+            return
+
+        m, W = 16.0, float(self.width())
+        y = m
+        p.setFont(QFont(self.font().family(), 9))
+        bar_h = 22.0
+        for i in range(naxes):
+            v = self.axes.get(i, 0.0)
+            rect = QRectF(m, y, W - 2 * m, bar_h)
+            mapped = self.label_fn("axis", i)
+            p.setPen(QPen(QColor(theme.GREEN if mapped else theme.BORDER), 1.5))
+            p.setBrush(QColor(theme.BG))
+            p.drawRoundedRect(rect, 4, 4)
+            cx = rect.center().x()
+            fill = v * (rect.width() / 2 - 3)
+            fr = (QRectF(cx, rect.top() + 3, fill, bar_h - 6) if fill >= 0
+                  else QRectF(cx + fill, rect.top() + 3, -fill, bar_h - 6))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(theme.ACCENT))
+            p.drawRoundedRect(fr, 3, 3)
+            p.setPen(QColor(theme.TEXT))
+            text = f"Axis {i}" + (f"  →  {mapped}" if mapped else "  (unassigned)") + f"     {v:+.2f}"
+            p.drawText(rect.adjusted(8, 0, -8, 0),
+                       int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), text)
+            self._hit.append((rect, f"axis:{i}"))
+            y += bar_h + 8
+
+        y += 8
+        if nbuttons:
+            p.setPen(QColor(theme.TEXT_DIM))
+            p.drawText(QRectF(m, y, W - 2 * m, 16), int(Qt.AlignmentFlag.AlignLeft),
+                       f"{nbuttons} buttons — press one to light it; click a square to assign it")
+            y += 22
+        cols = max(8, min(16, int((W - 2 * m) // 46)))
+        cell = max(26.0, ((W - 2 * m) - (cols - 1) * 6) / cols)
+        for i in range(nbuttons):
+            r, c = divmod(i, cols)
+            rect = QRectF(m + c * (cell + 6), y + r * (cell + 6), cell, cell)
+            lit = i in self.pressed
+            mapped = self.label_fn("button", i)
+            edge = theme.ACCENT if lit else (theme.GREEN if mapped else theme.BORDER)
+            p.setPen(QPen(QColor(edge), 1.5))
+            p.setBrush(QColor(theme.ACCENT if lit else theme.PANEL))
+            p.drawRoundedRect(rect, 5, 5)
+            p.setPen(QColor(theme.INK_ON_BRIGHT if lit else (theme.TEXT if mapped else theme.TEXT_FAINT)))
+            p.drawText(rect, int(Qt.AlignmentFlag.AlignCenter), str(i))
+            if mapped:
+                self.setToolTip("")  # per-cell tooltips are impractical; label via assign menu
+            self._hit.append((rect, f"btn:{i}"))
+        p.end()
