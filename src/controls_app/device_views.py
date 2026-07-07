@@ -230,6 +230,27 @@ class DeviceView(QWidget):
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(accent if lit else QColor(theme.TEXT_FAINT))
                 p.drawRoundedRect(nub, 3, 3)
+            elif el.kind == "switch3":
+                # 3-position spring-return momentary: rests CENTER, flicks fwd/back.
+                p.setBrush(base)
+                p.drawRoundedRect(rect, 4, 4)
+                mid_y = rect.y() + rect.height() / 2
+                # detent marks (top / center / bottom) so all three positions read
+                p.setPen(QPen(border, 1))
+                for fy in (0.16, 0.5, 0.84):
+                    y = rect.y() + rect.height() * fy
+                    p.drawLine(int(rect.x() + 4), int(y), int(rect.right() - 4), int(y))
+                nub_h = rect.height() * 0.28
+                direction = self.switch_dir.get(el.id, 0)   # default NEUTRAL (center)
+                if direction > 0:                            # pushed forward (away)
+                    nub_y = rect.y() + 2
+                elif direction < 0:                          # pulled back (toward you)
+                    nub_y = rect.bottom() - nub_h - 2
+                else:                                        # spring-centered rest
+                    nub_y = mid_y - nub_h / 2
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(accent if direction != 0 else QColor(theme.TEXT_DIM))
+                p.drawRoundedRect(QRectF(rect.x() + 2, nub_y, rect.width() - 4, nub_h), 3, 3)
             else:  # button / big
                 p.setBrush(QColor(theme.ROW_HOVER) if on else base)
                 p.drawRoundedRect(rect, 7, 7)
@@ -281,15 +302,15 @@ def _alpha() -> tuple[list[Element], list[Decor]]:
     elements = [
         Element("elevator", "PITCH", "gauge_v", (46, 90, 22, 180)),
         Element("aileron", "ROLL", "gauge_h", (392, 34, 216, 20)),
-        # LEFT grip: hat + white + TWO side-by-side rockers + trigger
+        # LEFT grip: hat + white + TWO side-by-side 3-position spring switches + trigger
         Element("hat", "HAT", "hat", (140, 100, 48, 48)),
         Element("left_white", "WHT", "round", (256, 104, 28, 28)),
-        Element("left_rocker_l", "RK1", "switch", (150, 158, 24, 46)),
-        Element("left_rocker_r", "RK2", "switch", (182, 158, 24, 46)),
+        Element("left_rocker_l", "RK1", "switch3", (144, 150, 26, 58)),
+        Element("left_rocker_r", "RK2", "switch3", (178, 150, 26, 58)),
         Element("left_trigger", "TRIG", "round", (256, 162, 28, 28)),
-        # RIGHT grip: TWO stacked rockers + white + red
-        Element("right_rocker_top", "RK1", "switch", (700, 100, 24, 42)),
-        Element("right_rocker_bot", "RK2", "switch", (700, 150, 24, 42)),
+        # RIGHT grip: TWO stacked 3-position spring switches + white + red
+        Element("right_rocker_top", "RK1", "switch3", (696, 96, 26, 54)),
+        Element("right_rocker_bot", "RK2", "switch3", (696, 156, 26, 54)),
         Element("right_white", "WHT", "round", (766, 104, 28, 28)),
         Element("right_red", "RED", "round", (766, 160, 28, 28)),
         # Panel order matches the real Alpha: MASTER ALT, MASTER BAT, AVI 1, AVI 2

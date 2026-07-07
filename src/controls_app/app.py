@@ -58,6 +58,10 @@ PRIORITY_COLORS = {"essential": theme.RED, "recommended": theme.ACCENT, "optiona
 # lever, a released switch) isn't grabbed as the next control.
 CALIB_GAP_S = 4
 
+# Control kinds the diagram shows with an up/down/neutral nub. "switch" is a
+# 2-position maintained toggle; "switch3" a 3-position spring-return momentary.
+SWITCH_KINDS = ("switch", "switch3")
+
 # How each device is named inside MSFS profile XML <Device DeviceName="...">
 MSFS_DEVICE_FRAGMENTS = {
     "honeycomb_alpha": "Alpha Flight Controls",
@@ -1116,9 +1120,12 @@ class MainWindow(QMainWindow):
                            "labels": ["move the hat"], "buffer": []}
             prompt = "push the hat in any direction"
         else:
-            is_switch = kind == "switch"
+            is_switch = kind in SWITCH_KINDS
             if spec and spec.kind == "button" and len(spec.slots) > 1:
                 labels = list(spec.slots)
+            elif kind == "switch3":
+                # 3-position spring switch: capture both momentary directions.
+                labels = ["push it FORWARD (away from you)", "pull it BACK (toward you)"]
             elif is_switch:
                 # Capture both positions in order so the diagram can show up vs
                 # down. A single-button switch finalizes early (see _on_button).
@@ -1294,9 +1301,10 @@ class MainWindow(QMainWindow):
         control = imap.control_for_button(index)
         if control:
             slots = imap.buttons_for_control(control)
-            if self._control_kind(device_id, control) == "switch" and len(slots) >= 2:
-                # Two-position rocker: slot 0 == up, slot 1 == down. Show the
-                # real direction instead of a single generic "pressed" state.
+            if self._control_kind(device_id, control) in SWITCH_KINDS and len(slots) >= 2:
+                # 2- or 3-position switch: slot 0 == up/forward, slot 1 == down/back.
+                # Show the real direction; a momentary switch springs back to neutral
+                # on release (direction 0).
                 slot = imap.button_slot(control, index)
                 direction = (1 if slot == 0 else -1) if pressed else 0
                 view.set_switch(control, direction)
@@ -1363,9 +1371,9 @@ class MainWindow(QMainWindow):
             # Outside calibration: click a switch to flip its SHOWN position so the
             # picture matches the real, maintained switch (the app can't know a
             # switch's rest state, and some read backward). Display-only sync.
-            if self._control_kind(view.device_id, control_id) == "switch":
+            if self._control_kind(view.device_id, control_id) in SWITCH_KINDS:
                 new = view.toggle_switch(control_id)
-                pos = {1: "UP / on", -1: "DOWN / off", 0: "centered"}.get(new, "?")
+                pos = {1: "UP / forward", -1: "DOWN / back", 0: "centered"}.get(new, "?")
                 self._set_status(f"{control_id}: shown as {pos} (click to flip)", theme.ACCENT)
             return
         if getattr(self, "_calib", None) is not None:

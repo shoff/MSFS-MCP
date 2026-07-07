@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# Input kinds: axis | lever | button | switch | rotary | hat | wheel
+# Input kinds: axis | lever | button | switch | switch3 | rotary | hat | wheel
+#   switch  = 2-position maintained (stays where you put it)
+#   switch3 = 3-position spring-return momentary: rests CENTER, push fwd/back,
+#             springs back to center (the Alpha yoke-grip switches)
 
 
 @dataclass
@@ -49,15 +52,15 @@ HONEYCOMB_ALPHA = DeviceProfile(
     inputs=[
         ControlInput("aileron", "Yoke roll (X axis)", "axis"),
         ControlInput("elevator", "Yoke pitch (Y axis)", "axis"),
-        # LEFT grip: hat, white button, TWO side-by-side rockers (each 2-way), a trigger
+        # LEFT grip: hat, white button, TWO side-by-side 3-position spring switches, a trigger
         ControlInput("hat", "8-way hat (left grip)", "hat"),
         ControlInput("left_white", "White button (left grip)", "button"),
-        ControlInput("left_rocker_l", "Left rocker — left (2-way)", "switch"),
-        ControlInput("left_rocker_r", "Left rocker — right (2-way)", "switch"),
+        ControlInput("left_rocker_l", "Left rocker — left (2-way)", "switch3"),
+        ControlInput("left_rocker_r", "Left rocker — right (2-way)", "switch3"),
         ControlInput("left_trigger", "Trigger (left grip)", "button"),
-        # RIGHT grip: TWO stacked rockers (each 2-way), white button, red button
-        ControlInput("right_rocker_top", "Right rocker — top (2-way)", "switch"),
-        ControlInput("right_rocker_bot", "Right rocker — bottom (2-way)", "switch"),
+        # RIGHT grip: TWO stacked 3-position spring switches, white button, red button
+        ControlInput("right_rocker_top", "Right rocker — top (2-way)", "switch3"),
+        ControlInput("right_rocker_bot", "Right rocker — bottom (2-way)", "switch3"),
         ControlInput("right_white", "White button (right grip)", "button"),
         ControlInput("right_red", "Red button (right grip)", "button"),
         ControlInput("sw_alt", "ALT rocker (switch panel)", "switch"),

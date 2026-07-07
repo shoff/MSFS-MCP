@@ -57,6 +57,27 @@ def test_calibrated_border_state(_app):
     assert not view.calibrated
 
 
+def test_yoke_grip_switches_are_three_position(_app):
+    from controls_app.device_views import _alpha
+    from controls_app.devices import DEVICE_BY_ID
+
+    grips = ["left_rocker_l", "left_rocker_r", "right_rocker_top", "right_rocker_bot"]
+    # 3-position spring switch in the model...
+    model = {c.id: c.kind for c in DEVICE_BY_ID["honeycomb_alpha"].inputs}
+    assert all(model[g] == "switch3" for g in grips)
+    # ...and in the diagram.
+    elements, decor = _alpha()
+    ekind = {e.id: e.kind for e in elements}
+    assert all(ekind[g] == "switch3" for g in grips)
+
+    view = DeviceView("honeycomb_alpha", elements, decor)
+    view.resize(1000, 460)
+    _render(view)                       # at rest (no switch_dir) -> center neutral, must render
+    for d in (1, -1, 0):                # forward / back / spring-centered
+        view.set_switch("left_rocker_l", d)
+        _render(view)
+
+
 def test_toggle_switch_flips_position(_app):
     elements, decor = _bravo()
     view = DeviceView("honeycomb_bravo", elements, decor)
