@@ -531,6 +531,7 @@ class MainWindow(QMainWindow):
         self._ask_timer.timeout.connect(self._tick_ask)
         self._ask_ticks = 0
         self._ask_auto = False
+        self._calib = None               # active guided-calibration sequence
         self._ai_done: set[str] = set()  # aircraft already auto-set-up this session
         self._written: set[str] = set()  # aircraft already auto-written this session
         self._write_worker: AutoWriteWorker | None = None
@@ -643,7 +644,8 @@ class MainWindow(QMainWindow):
         return header
 
     # ------------------------------------------------------------ main pane
-    FLOW_STEPS = ["① Pick aircraft", "② AI builds your setup", "③ ⭳ Write to MSFS", "④ ▶ Verify live"]
+    FLOW_STEPS = ["① Pick aircraft", "② 🧭 Calibrate each device", "③ AI builds your setup",
+                  "④ ⭳ Write to MSFS", "⑤ ▶ Verify live"]
 
     def _build_main_pane(self) -> QWidget:
         pane = QWidget(objectName="Root")
@@ -684,6 +686,23 @@ class MainWindow(QMainWindow):
         )
         self.learn_btn.toggled.connect(self._on_learn_toggle)
         title_row.addWidget(self.learn_btn)
+        self.calib_btn = QToolButton()
+        self.calib_btn.setText("🧭 Calibrate")
+        self.calib_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.calib_btn.setToolTip(
+            "Guided setup for THIS device: the app highlights each control, you operate\n"
+            "the real one, and it's saved. Afterwards the diagram and MSFS writes use\n"
+            "your actual button/axis numbers — fixes any wrong mappings."
+        )
+        self.calib_btn.clicked.connect(self._start_calibration)
+        title_row.addWidget(self.calib_btn)
+        self.skip_btn = QToolButton()
+        self.skip_btn.setText("Skip ▸")
+        self.skip_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.skip_btn.setToolTip("Skip this control during calibration")
+        self.skip_btn.clicked.connect(self._calib_skip)
+        self.skip_btn.hide()
+        title_row.addWidget(self.skip_btn)
         rescan = QToolButton()
         rescan.setText("⟳ Rescan")
         rescan.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -901,6 +920,62 @@ class MainWindow(QMainWindow):
     def _learn_active(self, control_id: str) -> bool:
         return getattr(self, "_learn", None) is not None and self._learn["control"] == control_id
 
+    # -- guided calibration: walk every control on the device once ---------
+    def _start_calibration(self) -> None:
+        device_id = self._current_device_id()
+        if not device_id or device_id == "keyboard_mouse":
+            QMessageBox.information(
+                self, "Pick a device",
+                "Select the Alpha, Bravo or rudder pedals in the sidebar first, then Calibrate.",
+            )
+            return
+        controls = [c.id for c in DEVICE_BY_ID[device_id].inputs]
+        if not controls:
+            return
+        self._calib = {"device": device_id, "order": controls, "idx": -1}
+        self.skip_btn.show()
+        self.calib_btn.setEnabled(False)
+        self.learn_btn.setChecked(True)  # enables the capture gate
+        self._calib_next()
+
+    def _calib_next(self) -> None:
+        calib = getattr(self, "_calib", None)
+        if calib is None:
+            return
+        calib["idx"] += 1
+        if calib["idx"] >= len(calib["order"]):
+            self._finish_calibration()
+            return
+        device_id, control_id = calib["device"], calib["order"][calib["idx"]]
+        self.views[device_id].set_selected(control_id)
+        self._begin_capture(device_id, control_id)
+        label = next((c.label for c in DEVICE_BY_ID[device_id].inputs if c.id == control_id), control_id)
+        n, total = calib["idx"] + 1, len(calib["order"])
+        self._set_status(f"Calibrate {n}/{total}: operate “{label}” now — or press Skip.", theme.ACCENT)
+
+    def _calib_skip(self) -> None:
+        if getattr(self, "_calib", None) is None:
+            return
+        self._learn = None
+        self._calib_next()
+
+    def _after_capture(self) -> None:
+        if getattr(self, "_calib", None) is not None:
+            QTimer.singleShot(300, self._calib_next)
+
+    def _finish_calibration(self) -> None:
+        self._calib = None
+        self._learn = None
+        self.skip_btn.hide()
+        self.calib_btn.setEnabled(True)
+        self.learn_btn.setChecked(False)
+        for v in self.views.values():
+            v.set_selected(None)
+        self._set_status(
+            "✓ Calibration saved — the diagram and MSFS writes now use your real controls.",
+            theme.GREEN,
+        )
+
     def _on_button(self, device_id: str, index: int, pressed: bool) -> None:
         view, imap = self._view_and_map(device_id)
         self.raw_input.setText(f"{device_id}: button {index} {'▼' if pressed else '▲'}")
@@ -919,6 +994,7 @@ class MainWindow(QMainWindow):
                     f"Learned {learn['control']} → buttons {learn['buffer']} (saved)"
                 )
                 self._learn = None
+                self._after_capture()
             else:
                 nxt = learn["labels"][len(learn["buffer"])]
                 self.status.setText(f"Learn '{learn['control']}': now {nxt}…")
@@ -938,6 +1014,7 @@ class MainWindow(QMainWindow):
             save_maps(self.maps)
             self.status.setText(f"Learned {learn['control']} → axis {index} (saved)")
             self._learn = None
+            self._after_capture()
         control = imap.control_for_axis(index)
         if control:
             view.set_value(control, value)
@@ -962,10 +1039,16 @@ class MainWindow(QMainWindow):
             view.learn_mode = on
             if not on:
                 view.set_selected(None)
-        self.status.setText(
-            "Learn mode: click a control on the diagram, then press the real input(s) it prompts for."
-            if on else ""
-        )
+        # Turning Learn off aborts a calibration run in progress.
+        if not on and getattr(self, "_calib", None) is not None:
+            self._calib = None
+            self.skip_btn.hide()
+            self.calib_btn.setEnabled(True)
+        if not self._calib:
+            self.status.setText(
+                "Learn mode: click a control on the diagram, then press the real input(s) it prompts for."
+                if on else ""
+            )
 
     def eventFilter(self, obj, event):  # noqa: N802 — keyboard/mouse visualizer
         if self.isActiveWindow():
@@ -1053,7 +1136,7 @@ class MainWindow(QMainWindow):
     def _on_plan_ready(self, plan: ControlPlan) -> None:
         self.plans[plan.aircraft_key] = plan
         self._reset_ask_button()
-        self._update_flow(3)  # setup built -> next is Write to MSFS
+        self._update_flow(4)  # setup built -> next is Write to MSFS
         if plan.aircraft_key == self._current_aircraft_key():
             self.plan = plan
             self._refresh_views()
@@ -1100,7 +1183,7 @@ class MainWindow(QMainWindow):
                 f"✓ Written to MSFS — {summary}. Restart MSFS (or reselect the profile in "
                 f"Options → Controls) to load it.", theme.GREEN,
             )
-            self._update_flow(4)  # written -> optionally Verify live
+            self._update_flow(5)  # written -> optionally Verify live
         elif wrote:
             self._set_status(
                 f"✓ Wrote {len(wrote)} device(s); {len(failed)} need attention — see the dialog.",
