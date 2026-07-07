@@ -52,10 +52,12 @@ DEFAULT_MAPS: dict[str, dict] = {
     "honeycomb_alpha": {
         "axes": {"0": "aileron", "1": "elevator"},
         "buttons": {
-            "ap_disc": [0],
-            "wheel_l": [1, 2],
-            "wheel_r": [3, 4],
-            "rocker_r": [5, 6],
+            "left_white": [0],
+            "left_rocker": [1, 2],
+            "left_trigger": [3],
+            "right_red": [4],
+            "right_white": [5],
+            "right_rocker": [6, 7],
             "sw_alt": [13, 14],
             "sw_bat": [15, 16],
             "sw_avionics1": [17, 18],

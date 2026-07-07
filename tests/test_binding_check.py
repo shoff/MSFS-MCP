@@ -48,7 +48,7 @@ def test_rudder_all_axes_testable():
 def test_alpha_magneto_and_switches_testable():
     result = _tests_for(HONEYCOMB_ALPHA, "honeycomb_alpha")
     controls = {t.control_id for t in result.tests}
-    assert {"aileron", "elevator", "magneto", "sw_bat", "sw_light_strobe", "ap_disc"} <= controls
+    assert {"aileron", "elevator", "magneto", "sw_bat", "sw_light_strobe", "right_red"} <= controls
 
 
 def test_unmapped_control_reported_as_untestable():

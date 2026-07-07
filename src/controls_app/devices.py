@@ -49,11 +49,15 @@ HONEYCOMB_ALPHA = DeviceProfile(
     inputs=[
         ControlInput("aileron", "Yoke roll (X axis)", "axis"),
         ControlInput("elevator", "Yoke pitch (Y axis)", "axis"),
-        ControlInput("ap_disc", "Red button (left horn)", "button"),
-        ControlInput("hat", "8-way hat (left thumb)", "hat"),
-        ControlInput("rocker_r", "Vertical rocker (right thumb)", "switch"),
-        ControlInput("wheel_l", "White button pair (left horn)", "button"),
-        ControlInput("wheel_r", "White button pair (right horn)", "button"),
+        # LEFT grip: hat, white button, a 2-way rocker (two buttons), a trigger
+        ControlInput("hat", "8-way hat (left grip)", "hat"),
+        ControlInput("left_white", "White button (left grip)", "button"),
+        ControlInput("left_rocker", "2-way rocker (left grip)", "switch"),
+        ControlInput("left_trigger", "Trigger (left grip)", "button"),
+        # RIGHT grip: a 2-way rocker (two buttons), white button, red button
+        ControlInput("right_rocker", "2-way rocker (right grip)", "switch"),
+        ControlInput("right_white", "White button (right grip)", "button"),
+        ControlInput("right_red", "Red button (right grip)", "button"),
         ControlInput("sw_alt", "ALT rocker (switch panel)", "switch"),
         ControlInput("sw_bat", "BAT rocker (switch panel)", "switch"),
         ControlInput("sw_avionics1", "AVIONICS BUS 1 rocker", "switch"),
