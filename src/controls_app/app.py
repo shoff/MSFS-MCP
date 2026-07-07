@@ -404,6 +404,105 @@ class WriteDialog(QDialog):
         self.accept()
 
 
+class DiagnosticsDialog(QDialog):
+    """Live view of every joystick the app sees, matched or not, with manual
+    slot assignment — the ‘why does my device do nothing?’ fix-it screen."""
+
+    BINDABLE = [
+        ("honeycomb_alpha", "Alpha yoke"),
+        ("honeycomb_bravo", "Bravo quadrant"),
+        ("velocityone_rudder", "Rudder pedals"),
+    ]
+
+    def __init__(self, parent, monitor: InputMonitor):
+        super().__init__(parent)
+        self.monitor = monitor
+        self.setWindowTitle("Hardware diagnostics")
+        self.resize(700, 640)
+
+        lay = QVBoxLayout(self)
+        intro = QLabel(
+            "Every joystick the app can see is listed below — move a control and watch it "
+            "react. If your pedals or yoke show up but aren’t matched (amber), pick them in "
+            "the ‘Drive … with’ boxes to force-assign them; the diagram and writing will then "
+            "use that device."
+        )
+        intro.setWordWrap(True)
+        lay.addWidget(intro)
+
+        self.view = QTextBrowser()
+        lay.addWidget(self.view, 1)
+
+        self.assign_combos: dict[str, QComboBox] = {}
+        for device_id, label in self.BINDABLE:
+            row = QHBoxLayout()
+            row.addWidget(QLabel(f"Drive {label} with:"))
+            combo = QComboBox()
+            combo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            combo.currentIndexChanged.connect(
+                lambda _i, d=device_id, c=combo: self.monitor.assign(d, c.currentData())
+            )
+            row.addWidget(combo, 1)
+            self.assign_combos[device_id] = combo
+            lay.addLayout(row)
+        self._populate_combos()
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+        self._timer = QTimer(self)
+        self._timer.setInterval(60)
+        self._timer.timeout.connect(self._refresh)
+        self._timer.start()
+        self._refresh()
+
+    def _populate_combos(self) -> None:
+        snap = self.monitor.raw_snapshot()
+        for combo in self.assign_combos.values():
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem("Auto (detect by name)", None)
+            for js in snap:
+                combo.addItem(f"Joystick {js['index']}: {js['name']}", js["index"])
+            combo.blockSignals(False)
+
+    def _refresh(self) -> None:
+        snap = self.monitor.raw_snapshot()
+        if not snap:
+            self.view.setHtml(
+                f"<p style='color:{theme.AMBER}'>No joysticks are visible to the app.</p>"
+                f"<p style='color:{theme.TEXT_DIM}'>Check the USB connection and that the "
+                "device works in Windows ‘Set up USB game controllers’, then click Rescan.</p>"
+            )
+            return
+        blocks = []
+        for js in snap:
+            vidpid = f"{js['vid']:04X}:{js['pid']:04X}" if js["vid"] else "—"
+            if js["matched"]:
+                tag = f"<span style='color:{theme.GREEN}'>→ {js['matched']}</span>"
+            else:
+                tag = f"<span style='color:{theme.AMBER}'>not matched (assign it below)</span>"
+            axes = " ".join(
+                (f"<b style='color:{theme.ACCENT}'>{a}:{v:+.2f}</b>" if abs(v) > 0.15
+                 else f"<span style='color:{theme.TEXT_DIM}'>{a}:{v:+.2f}</span>")
+                for a, v in enumerate(js["axes"])
+            ) or "<i>none</i>"
+            btns = (" ".join(f"<b style='color:{theme.ACCENT}'>{b}</b>" for b in js["buttons"])
+                    if js["buttons"] else f"<span style='color:{theme.TEXT_DIM}'>none</span>")
+            blocks.append(
+                f"<p><b>Joystick {js['index']}: {js['name']}</b> {tag}<br>"
+                f"<span style='color:{theme.TEXT_DIM}'>USB {vidpid} · "
+                f"{len(js['axes'])} axes · {js['num_buttons']} buttons</span><br>"
+                f"axes: {axes}<br>buttons pressed: {btns}</p>"
+            )
+        self.view.setHtml("".join(blocks))
+
+    def done(self, result: int) -> None:  # noqa: N802
+        self._timer.stop()
+        super().done(result)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, plans: dict[str, ControlPlan], detected: dict[str, bool]):
         super().__init__()
@@ -555,6 +654,15 @@ class MainWindow(QMainWindow):
         rescan.setToolTip("Re-detect connected hardware")
         rescan.clicked.connect(lambda: self.monitor.rescan())
         title_row.addWidget(rescan)
+        diagnose = QToolButton()
+        diagnose.setText("🔎 Hardware")
+        diagnose.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        diagnose.setToolTip(
+            "See every joystick the app detects with live input, and force-assign\n"
+            "a device if it isn't matched automatically (e.g. rudder pedals)."
+        )
+        diagnose.clicked.connect(self._open_diagnostics)
+        title_row.addWidget(diagnose)
         self.device_status = QLabel(objectName="SectionMeta")
         title_row.addWidget(self.device_status)
         lay.addLayout(title_row)
@@ -936,6 +1044,9 @@ class MainWindow(QMainWindow):
         self._ask_timer.stop()
         self.ask_btn.setEnabled(True)
         self.ask_btn.setText("✦ AI Setup")
+
+    def _open_diagnostics(self) -> None:
+        DiagnosticsDialog(self, self.monitor).exec()
 
     # ------------------------------------------------------------ profiles
     def _write_to_msfs(self) -> None:

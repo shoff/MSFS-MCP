@@ -30,6 +30,7 @@ class InputMonitor(QObject):
         self._pygame = None
         self._sticks: dict[str, object] = {}     # device_id -> pygame joystick
         self._state: dict[str, dict] = {}        # device_id -> {buttons: [], axes: [], hats: []}
+        self._manual: dict[str, int] = {}        # device_id -> forced joystick index
         self.available = False
         self._timer = QTimer(self)
         self._timer.setInterval(POLL_MS)
@@ -59,8 +60,20 @@ class InputMonitor(QObject):
             except Exception:
                 pass
 
+    def _bind(self, device_id: str, stick) -> None:
+        self._sticks[device_id] = stick
+        self._state[device_id] = {
+            "buttons": [False] * stick.get_numbuttons(),
+            "axes": [0.0] * stick.get_numaxes(),
+            "hats": [(0, 0)] * stick.get_numhats(),
+        }
+
     def rescan(self) -> None:
-        """Re-enumerate joysticks and match them to known device profiles."""
+        """Re-enumerate joysticks and match them to known device profiles.
+
+        Manual assignments (see ``assign``) win over automatic name/USB
+        matching, so a device the app doesn't recognize can still be driven.
+        """
         if not self._pygame:
             return
         pygame = self._pygame
@@ -68,9 +81,23 @@ class InputMonitor(QObject):
         pygame.joystick.init()
         self._sticks.clear()
         self._state.clear()
+
+        sticks = {}
         for i in range(pygame.joystick.get_count()):
             stick = pygame.joystick.Joystick(i)
             stick.init()
+            sticks[i] = stick
+
+        used: set[int] = set()
+        # 1) manual overrides first
+        for device_id, idx in self._manual.items():
+            if idx in sticks and idx not in used:
+                self._bind(device_id, sticks[idx])
+                used.add(idx)
+        # 2) automatic name / USB-id matching for the rest
+        for i, stick in sticks.items():
+            if i in used:
+                continue
             name = stick.get_name()
             guid = stick.get_guid() if hasattr(stick, "get_guid") else None
             vid, pid = vid_pid_from_guid(guid)
@@ -78,15 +105,60 @@ class InputMonitor(QObject):
                 if device.always_present or device.id in self._sticks:
                     continue
                 if device.matches(name, vid, pid):
-                    self._sticks[device.id] = stick
-                    self._state[device.id] = {
-                        "buttons": [False] * stick.get_numbuttons(),
-                        "axes": [0.0] * stick.get_numaxes(),
-                        "hats": [(0, 0)] * stick.get_numhats(),
-                    }
+                    self._bind(device.id, stick)
+                    used.add(i)
                     break
         detected = {d.id: (d.always_present or d.id in self._sticks) for d in DEVICES}
         self.devices_changed.emit(detected)
+
+    def assign(self, device_id: str, joystick_index: int | None) -> None:
+        """Force a physical joystick (by index) to drive a device slot, or pass
+        None to clear the override. Takes effect immediately."""
+        if joystick_index is None:
+            self._manual.pop(device_id, None)
+        else:
+            self._manual[device_id] = joystick_index
+        self.rescan()
+
+    def raw_snapshot(self) -> list[dict]:
+        """Live state of EVERY connected joystick, matched or not — the data the
+        diagnostics view renders so the user can see what the app actually sees."""
+        if not self._pygame:
+            return []
+        pygame = self._pygame
+        try:
+            pygame.event.pump()
+        except Exception:
+            return []
+        out = []
+        for i in range(pygame.joystick.get_count()):
+            try:
+                stick = pygame.joystick.Joystick(i)
+                if hasattr(stick, "get_init") and not stick.get_init():
+                    stick.init()
+                name = stick.get_name()
+                guid = stick.get_guid() if hasattr(stick, "get_guid") else None
+                vid, pid = vid_pid_from_guid(guid)
+                matched = next(
+                    (d.id for d in DEVICES
+                     if not d.always_present and d.matches(name, vid, pid)),
+                    None,
+                )
+                # honor a manual override in what we report as matched
+                for dev_id, idx in self._manual.items():
+                    if idx == i:
+                        matched = dev_id
+                out.append({
+                    "index": i, "name": name, "guid": guid, "vid": vid, "pid": pid,
+                    "matched": matched,
+                    "axes": [round(stick.get_axis(a), 2) for a in range(stick.get_numaxes())],
+                    "buttons": [b for b in range(stick.get_numbuttons()) if stick.get_button(b)],
+                    "num_buttons": stick.get_numbuttons(),
+                    "hats": [stick.get_hat(h) for h in range(stick.get_numhats())],
+                })
+            except Exception:
+                continue
+        return out
 
     # ------------------------------------------------------------------
     def _poll(self) -> None:

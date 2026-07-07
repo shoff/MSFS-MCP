@@ -115,6 +115,16 @@ control:
   in-session changes. MSFS must be restarted (or the profile reselected in
   Options → Controls) to load written changes.
 
+## Hardware not responding? (🔎 Hardware)
+
+If a device — commonly rudder pedals — does nothing, click **🔎 Hardware** in
+the toolbar. It lists *every* joystick the app can see with live input, so you
+can tell at a glance whether the device is detected and which axes move when you
+press it. If it shows up but is **not matched** (amber), pick it in the
+**“Drive Rudder pedals with …”** box to force-assign it — the diagram and
+writing then use that device. If it doesn't appear at all, it's a USB/driver
+issue (verify it in Windows “Set up USB game controllers”).
+
 Each build sends:
 
 - the chosen aircraft + its V-speeds and checklist phases (from the checklist app data),
