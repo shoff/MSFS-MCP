@@ -1156,7 +1156,7 @@ class MainWindow(QMainWindow):
         self.status.setText(f"Learn '{control_id}': {prompt}…")
 
     def _finish_button_learn(self, imap, learn, device_id) -> None:
-        """Persist a completed button/switch capture and advance calibration."""
+        """Persist a completed plain-Learn button/switch capture (not calibration)."""
         imap.set_control_buttons(learn["control"], learn["buffer"])
         save_maps(self.maps)
         self.views[device_id].set_calibrated(learn["control"])
@@ -1164,18 +1164,16 @@ class MainWindow(QMainWindow):
             f"Learned {learn['control']} → buttons {learn['buffer']} (saved)"
         )
         self._learn = None
-        self._after_capture()
 
     def _learn_active(self, control_id: str) -> bool:
         return getattr(self, "_learn", None) is not None and self._learn["control"] == control_id
 
-    def _calib_buttons(self, mode: str) -> None:
-        """Show the right calibration buttons for the current phase.
-        mode: 'capture' (operating a control) | 'confirm' (accept/redo) | 'off'."""
-        self.skip_btn.setVisible(mode == "capture")
-        self.accept_btn.setVisible(mode == "confirm")
-        self.redo_btn.setVisible(mode == "confirm")
-        self.restart_btn.setVisible(mode in ("capture", "confirm"))
+    def _calib_buttons(self, on: bool) -> None:
+        """Accept / Redo / Skip / Start-over are visible for the WHOLE time a
+        control is being calibrated — so the user can always say 'this one's done'
+        (Accept) or 'try again' (Redo), even for controls that don't auto-complete."""
+        for b in (self.accept_btn, self.redo_btn, self.skip_btn, self.restart_btn):
+            b.setVisible(on)
 
     # -- guided calibration: walk the device's controls (or just one) ------
     def _start_calibration(self) -> None:
@@ -1198,7 +1196,7 @@ class MainWindow(QMainWindow):
             self.views[device_id].clear_calibrated()   # full run: no green until re-done
         if self.rawview_btn.isChecked():
             self.rawview_btn.setChecked(False)  # show the diagram so highlights are visible
-        self._calib_buttons("capture")
+        self._calib_buttons(True)
         self.calib_btn.setEnabled(False)
         self.learn_btn.setChecked(True)  # enables the capture gate
         self._calib_next()
@@ -1231,12 +1229,11 @@ class MainWindow(QMainWindow):
         calib = getattr(self, "_calib", None)
         if calib is None:
             return
-        self._calib_pending = None
         calib["idx"] += 1
         if calib["idx"] >= len(calib["order"]):
             self._finish_calibration()
             return
-        self._calib_buttons("capture")
+        self._calib_buttons(True)
         device_id, control_id = calib["device"], calib["order"][calib["idx"]]
         self.views[device_id].set_selected(control_id)
         # Capture stays OFF until the control actually starts (see _calib_begin),
@@ -1274,75 +1271,88 @@ class MainWindow(QMainWindow):
         if calib is None:
             return
         device_id = calib["device"]
+        self._calib_captured = False
         self._begin_capture(device_id, control_id)
         label = next((c.label for c in DEVICE_BY_ID[device_id].inputs if c.id == control_id), control_id)
         n, total = calib["idx"] + 1, len(calib["order"])
         how = self._learn.get("labels", ["operate it"])[0] if self._learn else "operate it"
-        self._calib_banner(f"🧭 Calibrate {n}/{total}: {label} — {how} now, or press Skip ▸")
-        self._set_status(f"Calibrate {n}/{total}: {label} — {how} now, or press Skip.", theme.ACCENT)
+        self._calib_buttons(True)
+        self._calib_banner(f"🧭 Calibrate {n}/{total}: {label} — {how}, then ✓ Accept ▸")
+        self._set_status(
+            f"Calibrate {n}/{total}: {label} — {how}. The diagram shows what it grabbed; "
+            "✓ Accept ▸ to save & continue, ↻ Redo, or Skip ▸.", theme.ACCENT,
+        )
 
     def _calib_skip(self) -> None:
         if getattr(self, "_calib", None) is None:
             return
         self._learn = None
-        self._calib_pending = None
         self._calib_next()
-
-    def _after_capture(self) -> None:
-        # A capture just completed. Don't auto-advance — wait for the user to
-        # Accept (or Redo) so they can confirm it grabbed the right control.
-        calib = getattr(self, "_calib", None)
-        if calib is None:
-            return
-        control_id = calib["order"][calib["idx"]]
-        QTimer.singleShot(150, lambda: self._show_accept(control_id))
 
     def _capture_summary(self, device_id: str, control_id: str) -> str:
         imap = self.maps[device_id]
         kind = self._control_kind(device_id, control_id)
         if kind in ("axis", "lever"):
-            return f"axis {imap.axis_for_control(control_id)}"
+            a = imap.axis_for_control(control_id)
+            return f"axis {a}" if a is not None else "nothing yet"
         if kind == "hat":
             hats = [i for i, c in imap.hats.items() if c == control_id]
-            return f"hat {hats[0] if hats else '?'}"
-        return f"button(s) {imap.buttons_for_control(control_id)}"
+            return f"hat {hats[0]}" if hats else "nothing yet"
+        btns = imap.buttons_for_control(control_id)
+        return f"button(s) {btns}" if btns else "nothing yet"
 
-    def _show_accept(self, control_id: str) -> None:
-        calib = getattr(self, "_calib", None)
-        if calib is None or calib["order"][calib["idx"]] != control_id:
-            return
-        self._calib_pending = control_id
-        device_id = calib["device"]
+    def _calib_note_capture(self, device_id: str, control_id: str) -> None:
+        """A live input was just assigned to the control being calibrated. Show
+        it and keep waiting — the user advances by clicking ✓ Accept ▸."""
+        self._calib_captured = True
+        calib = self._calib
         label = next((c.label for c in DEVICE_BY_ID[device_id].inputs if c.id == control_id), control_id)
+        n, total = calib["idx"] + 1, len(calib["order"])
         got = self._capture_summary(device_id, control_id)
-        self._calib_buttons("confirm")
-        self._calib_banner(f"✓ Captured {label} → {got}.  ✓ Accept ▸ to continue, or ↻ Redo")
-        self._set_status(f"Captured {label} → {got}. Accept to continue, or Redo if wrong.", theme.GREEN)
+        learn = getattr(self, "_learn", None)
+        labels = learn.get("labels", []) if learn else []
+        done = len(self.maps[device_id].buttons_for_control(control_id))
+        if learn and not learn.get("is_axis") and not learn.get("is_hat") and done < len(labels):
+            nxt = labels[done]
+            self._calib_banner(f"🧭 {n}/{total} {label}: {got} — now {nxt}, or ✓ Accept ▸ if done")
+        else:
+            self._calib_banner(f"✓ {n}/{total} {label}: {got} — ✓ Accept ▸ to continue, or ↻ Redo")
+        self._set_status(f"{label}: {got}. ✓ Accept ▸ to save & continue, ↻ Redo, or Skip ▸.", theme.GREEN)
 
     def _calib_accept(self) -> None:
-        if getattr(self, "_calib_pending", None) is None:
+        calib = getattr(self, "_calib", None)
+        if calib is None:
             return
-        self._calib_pending = None
-        self._calib_buttons("capture")
+        device_id, control_id = calib["device"], calib["order"][calib["idx"]]
+        if not getattr(self, "_calib_captured", False):
+            self._set_status("Operate the control first — nothing captured yet.", theme.AMBER)
+            return
+        self.views[device_id].set_calibrated(control_id)   # green = accepted
+        self._learn = None
         self._calib_next()
 
     def _calib_redo(self) -> None:
-        pending = getattr(self, "_calib_pending", None)
         calib = getattr(self, "_calib", None)
-        if pending is None or calib is None:
+        if calib is None:
             return
-        self._calib_pending = None
-        # Un-mark it (border back to amber) and re-open capture immediately.
-        self.views[calib["device"]].set_calibrated(pending, done=False)
-        self._calib_buttons("capture")
-        self._calib_begin(pending)
+        device_id, control_id = calib["device"], calib["order"][calib["idx"]]
+        imap = self.maps[device_id]
+        # Wipe whatever this control grabbed and re-open the capture from scratch.
+        imap.buttons.pop(control_id, None)
+        imap.axes = {i: c for i, c in imap.axes.items() if c != control_id}
+        imap.hats = {i: c for i, c in imap.hats.items() if c != control_id}
+        save_maps(self.maps)
+        view = self.views[device_id]
+        view.set_calibrated(control_id, done=False)
+        view.set_switch(control_id, 0)
+        self._calib_begin(control_id)
 
     def _finish_calibration(self) -> None:
         single = bool(self._calib and self._calib.get("single"))
         self._calib = None
         self._learn = None
-        self._calib_pending = None
-        self._calib_buttons("off")
+        self._calib_captured = False
+        self._calib_buttons(False)
         self.calib_btn.setEnabled(True)
         self.learn_btn.setChecked(False)
         self._update_input_banner()  # restore the normal banner state
@@ -1362,32 +1372,47 @@ class MainWindow(QMainWindow):
         if pressed:
             self._focus_device(device_id)
         learn = getattr(self, "_learn", None)
+        in_calib = getattr(self, "_calib", None) is not None
         if pressed and view.learn_mode and learn and not learn["is_axis"] and not learn.get("is_hat"):
+            cid = learn["control"]
+            is_switch = self._control_kind(device_id, cid) in SWITCH_KINDS
             if index in learn["buffer"]:
-                # A switch that reports only ONE button (flip up == flip down)
-                # can't produce a second distinct index — the user pressing the
-                # same one again finalizes it instead of hanging the capture.
-                if learn.get("is_switch") and learn["buffer"]:
+                # Same button again: for a single-button switch in plain Learn,
+                # that means "no second direction" -> finalize.
+                if not in_calib and learn.get("is_switch") and learn["buffer"]:
                     self._finish_button_learn(imap, learn, device_id)
-                return  # otherwise ignore a repeat of an already-captured slot
+                return
+            slot = len(learn["buffer"])          # 0 = first prompted dir, 1 = second
             learn["buffer"].append(index)
-            view.pulse(learn["control"])
-            if len(learn["buffer"]) >= len(learn["labels"]):
-                self._finish_button_learn(imap, learn, device_id)
+            if in_calib:
+                # Assign live to THIS control (steals the index from any other),
+                # and SHOW the switch move the way we're assigning it so the user
+                # can see it's right (or hit Redo).
+                imap.set_control_buttons(cid, learn["buffer"])
+                save_maps(self.maps)
+                if is_switch:
+                    view.set_switch(cid, 1 if slot == 0 else -1)
+                else:
+                    view.pulse(cid)
+                self._calib_note_capture(device_id, cid)
             else:
-                nxt = learn["labels"][len(learn["buffer"])]
-                self.status.setText(f"Learn '{learn['control']}': now {nxt}…")
+                view.pulse(cid)
+                if len(learn["buffer"]) >= len(learn["labels"]):
+                    self._finish_button_learn(imap, learn, device_id)
+                else:
+                    nxt = learn["labels"][len(learn["buffer"])]
+                    self.status.setText(f"Learn '{cid}': now {nxt}…")
             return
         control = imap.control_for_button(index)
         if control:
-            slots = imap.buttons_for_control(control)
-            if self._control_kind(device_id, control) in SWITCH_KINDS and len(slots) >= 2:
-                # 2- or 3-position switch: slot 0 == up/forward, slot 1 == down/back.
-                # Show the real direction; a momentary switch springs back to neutral
-                # on release (direction 0).
-                slot = imap.button_slot(control, index)
-                direction = (1 if slot == 0 else -1) if pressed else 0
-                view.set_switch(control, direction)
+            kind = self._control_kind(device_id, control)
+            slot = imap.button_slot(control, index)
+            if kind in ("switch3", "switch3h"):
+                # Momentary 3-position: show the pushed direction (slot 0 =
+                # forward/right, slot 1 = back/left), spring back to CENTER on release.
+                view.set_switch(control, (1 if slot == 0 else -1) if (pressed and slot is not None) else 0)
+            elif kind == "switch" and len(imap.buttons_for_control(control)) >= 2:
+                view.set_switch(control, (1 if slot == 0 else -1) if pressed else 0)
             else:
                 view.set_pressed(control, pressed)
         self._bridge_dispatch_button(device_id, index, pressed)
@@ -1415,10 +1440,13 @@ class MainWindow(QMainWindow):
             if spans[lead] > 0.5 and spans[lead] >= max(others, default=0.0) + 0.3:
                 imap.learn_axis(lead, learn["control"])
                 save_maps(self.maps)
-                view.set_calibrated(learn["control"])
-                self.status.setText(f"Learned {learn['control']} → axis {lead} (saved)")
-                self._learn = None
-                self._after_capture()
+                if getattr(self, "_calib", None) is not None:
+                    # Live-learn so the diagram moves; wait for Accept to advance.
+                    self._calib_note_capture(device_id, learn["control"])
+                else:
+                    view.set_calibrated(learn["control"])
+                    self.status.setText(f"Learned {learn['control']} → axis {lead} (saved)")
+                    self._learn = None
         control = imap.control_for_axis(index)
         if control:
             view.set_value(control, value)
@@ -1433,11 +1461,13 @@ class MainWindow(QMainWindow):
         if view.learn_mode and learn and learn.get("is_hat"):
             imap.learn_hat(index, learn["control"])
             save_maps(self.maps)
-            view.set_calibrated(learn["control"])
-            self.status.setText(f"Learned {learn['control']} → hat {index} (saved)")
             view.pulse(learn["control"])
-            self._learn = None
-            self._after_capture()
+            if getattr(self, "_calib", None) is not None:
+                self._calib_note_capture(device_id, learn["control"])
+            else:
+                view.set_calibrated(learn["control"])
+                self.status.setText(f"Learned {learn['control']} → hat {index} (saved)")
+                self._learn = None
             return
         control = imap.hats.get(index)
         if control:
@@ -1558,8 +1588,8 @@ class MainWindow(QMainWindow):
         # Turning Learn off aborts a calibration run in progress.
         if not on and getattr(self, "_calib", None) is not None:
             self._calib = None
-            self._calib_pending = None
-            self._calib_buttons("off")
+            self._calib_captured = False
+            self._calib_buttons(False)
             self.calib_btn.setEnabled(True)
             self._update_input_banner()
         if not self._calib:
