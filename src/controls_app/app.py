@@ -49,6 +49,7 @@ from .device_views import DeviceView, RawDeviceView, build_views
 from .devices import DEVICE_BY_ID, DEVICES, detect_connected
 from .input_map import InputMap, load_maps, save_maps
 from .input_monitor import InputMonitor
+from .sim_bridge import SimBridge, resolve_bridge_routes, scale_axis
 
 PRIORITY_COLORS = {"essential": theme.RED, "recommended": theme.ACCENT, "optional": theme.TEXT_FAINT}
 
@@ -619,6 +620,14 @@ class MainWindow(QMainWindow):
         self.monitor.start()
         self._update_input_banner()  # tell the user immediately if we see no hardware
 
+        # Live bridge: push hardware straight into the sim via SimConnect events.
+        # This is the ONLY way the SDL-invisible rudder pedals can fly the plane.
+        self._bridge_routes: dict[str, object] = {}
+        self.bridge = SimBridge(self)
+        self.bridge.state_changed.connect(self._on_bridge_state)
+        self.bridge.action_sent.connect(self._on_bridge_action)
+        self.bridge.start()
+
         # accurate device-read panels (real axis/button counts from SDL)
         for did in ("honeycomb_alpha", "honeycomb_bravo", "velocityone_rudder"):
             rv = RawDeviceView(did, self.monitor,
@@ -691,6 +700,16 @@ class MainWindow(QMainWindow):
         )
         self.verify_btn.clicked.connect(self._verify_live)
         lay.addWidget(self.verify_btn)
+
+        self.bridge_btn = QPushButton("🔗 Drive sim", objectName="WriteButton")
+        self.bridge_btn.setCheckable(True)
+        self.bridge_btn.setToolTip(
+            "Feed your hardware straight into MSFS over SimConnect — no profile\n"
+            "needed. This is how the rudder pedals (which MSFS can't see) fly the\n"
+            "plane. Turn OFF before binding controls inside MSFS to avoid doubles."
+        )
+        self.bridge_btn.toggled.connect(self._on_bridge_toggle)
+        lay.addWidget(self.bridge_btn)
 
         pin = QToolButton()
         pin.setText("⏏ On top")
@@ -1239,6 +1258,7 @@ class MainWindow(QMainWindow):
                 view.set_switch(control, direction)
             else:
                 view.set_pressed(control, pressed)
+        self._bridge_dispatch_button(device_id, index, pressed)
 
     def _on_axis(self, device_id: str, index: int, value: float) -> None:
         view, imap = self._view_and_map(device_id)
@@ -1269,6 +1289,7 @@ class MainWindow(QMainWindow):
         control = imap.control_for_axis(index)
         if control:
             view.set_value(control, value)
+        self._bridge_dispatch_axis(device_id, index, value)
 
     def _on_hat(self, device_id: str, index: int, x: int, y: int) -> None:
         view, imap = self._view_and_map(device_id)
@@ -1297,6 +1318,81 @@ class MainWindow(QMainWindow):
             return
         view.set_selected(control_id)      # plain Learn: click then operate it
         self._begin_capture(view.device_id, control_id)
+
+    # ---- live SimConnect bridge (hardware -> sim, no MSFS profile needed) ----
+    def _rebuild_bridge_routes(self) -> None:
+        """Resolve every planned device's controls into live-event routes."""
+        self._bridge_routes = {}
+        if not self.plan:
+            return
+        for device_id, bindings in self.plan.devices.items():
+            dev = DEVICE_BY_ID.get(device_id)
+            if dev is None or device_id not in self.maps:
+                continue
+            control_ids = {c.label: c.id for c in dev.inputs}
+            self._bridge_routes[device_id] = resolve_bridge_routes(
+                bindings, control_ids, self.maps[device_id]
+            )
+
+    def _on_bridge_toggle(self, on: bool) -> None:
+        if on:
+            self._rebuild_bridge_routes()
+            n_axes = sum(len(r.axes) for r in self._bridge_routes.values())
+            n_btns = sum(len(r.buttons) for r in self._bridge_routes.values())
+            self.bridge.set_enabled(True)
+            if n_axes or n_btns:
+                self._set_status(
+                    f"🔗 Driving sim: {n_axes} axes + {n_btns} buttons live over "
+                    "SimConnect. Turn OFF before binding controls inside MSFS.",
+                    theme.ACCENT,
+                )
+            else:
+                self._set_status(
+                    "🔗 Bridge on, but nothing is mapped yet — Calibrate a device first.",
+                    theme.AMBER,
+                )
+        else:
+            self.bridge.set_enabled(False)
+            self._set_status("Bridge off — hardware no longer drives the sim.", theme.TEXT_DIM)
+
+    def _on_bridge_state(self, state: str) -> None:
+        if not self.bridge.enabled:
+            self.bridge_btn.setText("🔗 Drive sim")
+            return
+        self.bridge_btn.setText(
+            {"live": "🔗 Driving ●", "connecting": "🔗 Connecting…",
+             "offline": "🔗 Sim offline"}.get(state, "🔗 Drive sim")
+        )
+        if state == "offline":
+            self._set_status(
+                "🔗 Bridge on but MSFS isn't reachable — start the sim and load a flight.",
+                theme.AMBER,
+            )
+
+    def _on_bridge_action(self, event: str, value: int) -> None:
+        self.raw_input.setText(f"→ MSFS  {event} = {value}")
+
+    def _bridge_dispatch_axis(self, device_id: str, index: int, value: float) -> None:
+        if not self.bridge.enabled:
+            return
+        view = self.views.get(device_id)
+        if view is not None and view.learn_mode:
+            return  # don't fly the plane while learning/calibrating
+        routes = self._bridge_routes.get(device_id)
+        route = routes.axes.get(index) if routes else None
+        if route is not None:
+            self.bridge.submit_axis(route.event, scale_axis(value, route.mode))
+
+    def _bridge_dispatch_button(self, device_id: str, index: int, pressed: bool) -> None:
+        if not pressed or not self.bridge.enabled:
+            return
+        view = self.views.get(device_id)
+        if view is not None and view.learn_mode:
+            return
+        routes = self._bridge_routes.get(device_id)
+        route = routes.buttons.get(index) if routes else None
+        if route is not None:
+            self.bridge.submit_button(route.event)
 
     def _on_learn_toggle(self, on: bool) -> None:
         self._learn = None
@@ -1529,9 +1625,12 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):  # noqa: N802
         llm.remove_listener(getattr(self, "_ai_listener", None))
         self.monitor.stop()
+        bridge = getattr(self, "bridge", None)
+        if bridge is not None:
+            bridge.stop()
         # Wait out any in-flight worker threads so none is destroyed mid-run
         # (Qt aborts the process on "QThread destroyed while running").
-        for attr in ("mcp_worker", "worker", "_write_worker"):
+        for attr in ("mcp_worker", "worker", "_write_worker", "bridge"):
             worker = getattr(self, attr, None)
             if worker is not None and worker.isRunning():
                 worker.wait(6000)
