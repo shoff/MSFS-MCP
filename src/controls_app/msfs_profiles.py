@@ -87,12 +87,53 @@ class InputProfile:
     device_names: list[str] = field(default_factory=list)
 
 
+# Directory names that never hold an input profile but are enormous — the MSFS
+# scenery/package/cache trees. Skipping them (and never descending into a
+# junction/symlink) keeps the scan from walking gigabytes and, worse, following
+# add-on junctions (e.g. NeoFly in Packages\Community) into other installs.
+_SKIP_DIRS = frozenset({
+    "packages", "community", "official", "onestore", "sceneryindexes",
+    "cache", "rollingcache", "wasm", "weather", "raidumps", "ghosts",
+    "simobjects", "missions", "flightplans", "layouts", "texturecache",
+})
+_MAX_SCAN_FILES = 30000  # backstop so a pathological tree can't hang the scan
+
+
+def _walk_shallow(root: Path):
+    """Yield files under ``root``, pruning the huge MSFS package/cache dirs and
+    never following reparse points (junctions/symlinks). Windows ``rglob`` DOES
+    follow junctions, which is what made this hang; ``os.walk`` lets us prune."""
+    import stat as _stat
+
+    reparse = getattr(_stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    seen = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        kept = []
+        for d in dirnames:
+            if d.lower() in _SKIP_DIRS:
+                continue
+            try:
+                attrs = getattr(os.stat(os.path.join(dirpath, d),
+                                        follow_symlinks=False), "st_file_attributes", 0)
+            except OSError:
+                continue
+            if attrs & reparse:      # a junction/symlink — don't descend
+                continue
+            kept.append(d)
+        dirnames[:] = kept
+        for f in filenames:
+            seen += 1
+            if seen > _MAX_SCAN_FILES:
+                return
+            yield Path(dirpath) / f
+
+
 def find_profiles(extra_roots: list[Path] | None = None) -> list[InputProfile]:
     """Scan the known locations (plus any extra folders) for input profiles.
 
-    Streams the directory walk (never materializes the whole tree), reads only
-    each candidate's 4 KB head, and skips oversized/empty files by stat before
-    opening — so it stays cheap even over a large MS Store WGS container.
+    Reads only each candidate's 4 KB head, skips oversized/empty files by stat,
+    prunes the giant scenery/cache dirs, and never follows junctions — so it
+    stays fast (and terminates) even on a big install with add-on junctions.
     """
     profiles: list[InputProfile] = []
     scan: list[tuple[str, Path]] = list(candidate_roots())
@@ -101,7 +142,7 @@ def find_profiles(extra_roots: list[Path] | None = None) -> list[InputProfile]:
     for source, root in scan:
         if not root.is_dir():
             continue
-        for path in root.rglob("*"):
+        for path in _walk_shallow(root):
             name = path.name.lower()
             if not (name.startswith("inputprofile") or "wgs" in str(path).lower()
                     or source == "custom folder"):

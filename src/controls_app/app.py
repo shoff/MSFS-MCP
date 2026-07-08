@@ -358,9 +358,18 @@ class WriteDialog(QDialog):
         self.profiles = profiles
         self.profile_list.clear()
         if not profiles:
-            self.profile_list.addItem(
-                "No MSFS input profiles found — is MSFS installed on this machine? Use Browse…"
-            )
+            for line in (
+                "No editable MSFS input-profile files found on this PC.",
+                "MSFS 2024 keeps control bindings in the cloud, not as local files",
+                "the way MSFS 2020 did — so there's nothing here to write into.",
+                "",
+                "→ Use 🔗 Drive sim instead: with MSFS running it feeds your",
+                "   calibrated controls straight into the sim over SimConnect,",
+                "   no profile file needed.",
+                "",
+                "(If you do have a local profile, point at it with Browse…)",
+            ):
+                self.profile_list.addItem(line)
             return
         for prof in profiles:
             devices = ", ".join(prof.device_names)
